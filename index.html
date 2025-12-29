@@ -47,6 +47,7 @@
         .month-nav h2 { margin: 0; font-size: 1.1rem; min-width: 120px; text-align: center; }
 
         .budget-row { display: flex; align-items: center; gap: 10px; font-weight: 500; }
+        .top-actions { display: flex; gap: 10px; }
 
         /* --- BUTTONS & INPUTS --- */
         button {
@@ -58,24 +59,28 @@
         button.btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
         button.btn-text { background: transparent; color: var(--text-sub); padding: 5px; }
         button.btn-success { background: var(--success); }
-        button.btn-danger { background: var(--danger); }
         button.btn-danger-outline { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
-        button.btn-warning { background: var(--warning); color: #fff; }
         button.btn-sm { padding: 6px 12px; font-size: 0.8rem; }
         
-        /* Plain text buttons for actions */
         button.action-btn { 
             background: #f1f5f9; color: var(--text-main); font-weight: 500; 
             font-size: 0.8rem; padding: 5px 10px; border: 1px solid var(--border);
         }
 
-        input {
+        input[type="text"], input[type="number"], input[type="email"], input[type="password"], input[type="url"], input[type="date"] {
             padding: 10px; border: 1px solid var(--border); border-radius: 8px;
             font-size: 1rem; background: #fff; width: 100%;
         }
+        
+        /* Checkbox styling */
+        .checkbox-wrapper {
+            display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--text-sub);
+            margin-top: 5px; cursor: pointer;
+        }
+        input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
 
         /* --- INBOX / PENDING DRAWER --- */
-        #inboxBtn { width: 100%; text-align: left; margin-bottom: 10px; justify-content: space-between; }
+        #inboxBtn { width: 100%; text-align: left; justify-content: space-between; flex-grow: 1; }
 
         .pending-drawer {
             background: var(--surface); border-radius: 12px; margin-bottom: 20px;
@@ -93,8 +98,8 @@
         #pendingAmount { width: 90px; flex-shrink: 0; }
         #pendingDesc { flex-grow: 1; }
         
-        .link-row { display: flex; align-items: center; gap: 8px; }
-        .link-input { font-size: 0.85rem; padding: 8px; color: var(--primary); }
+        .link-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .link-input { font-size: 0.85rem; padding: 8px; color: var(--primary); flex-grow: 1; }
 
         .pending-list { padding: 0; max-height: 400px; overflow-y: auto; }
 
@@ -193,7 +198,7 @@
         .modal.active { display: flex; }
         .modal-content {
             background: white; padding: 25px; border-radius: 16px;
-            width: 90%; max-width: 350px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            width: 90%; max-width: 400px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
         }
 
         .expense-list-item {
@@ -202,6 +207,11 @@
         }
         .expense-list-item:hover { background: #f8fafc; }
         .expense-list-item.editing { background: #fffbeb; border-left: 4px solid var(--warning); }
+        
+        .email-list-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px; border-bottom: 1px solid #eee; font-size: 0.9rem;
+        }
 
         /* --- LOGIN --- */
         #loginPrompt {
@@ -257,10 +267,13 @@
                 <input type="number" id="budgetInput" onchange="updateBudget()" placeholder="0" style="width:100px; text-align:right;">
             </div>
 
-            <button class="btn-outline" onclick="toggleInbox()" id="inboxBtn">
-                <span>📂 Unscheduled Expenses</span>
-                <span id="inboxCount" style="background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">0</span>
-            </button>
+            <div class="top-actions">
+                <button class="btn-outline" onclick="toggleInbox()" id="inboxBtn">
+                    <span>📂 Unscheduled Expenses</span>
+                    <span id="inboxCount" style="background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">0</span>
+                </button>
+                <button class="btn-text" style="font-size:1.2rem;" onclick="openSettings()">⚙️</button>
+            </div>
         </div>
 
         <div id="pendingDrawer" class="pending-drawer">
@@ -269,6 +282,11 @@
                     <input type="number" id="pendingAmount" placeholder="$">
                     <input type="text" id="pendingDesc" placeholder="Description">
                 </div>
+                
+                <label class="checkbox-wrapper">
+                    <input type="checkbox" id="pendingTax"> Include 10% Sales Tax
+                </label>
+
                 <div class="link-row">
                     <input type="url" id="pendingLink" class="link-input" placeholder="Paste Item Link (optional)">
                     <button type="button" id="addPendingBtn" onclick="addPendingItem()">Add to List</button>
@@ -297,10 +315,13 @@
         
         <div id="existingExpensesList" style="margin-bottom:15px; max-height:150px; overflow-y:auto; background:#f8fafc; border-radius:8px;"></div>
         
-        <div style="margin-bottom:10px;">
+        <div style="margin-bottom:5px;">
             <label style="font-size:0.8rem; color:var(--text-sub);">Amount</label>
             <input type="number" id="expenseAmount" step="0.01" placeholder="0.00" style="width:100%; font-size:1.2rem; padding:12px;">
         </div>
+        <label class="checkbox-wrapper" style="margin-bottom:10px;">
+            <input type="checkbox" id="expenseTax"> Include 10% Sales Tax
+        </label>
         
         <div style="margin-bottom:10px;">
             <label style="font-size:0.8rem; color:var(--text-sub);">Description</label>
@@ -315,6 +336,28 @@
         <div style="display:flex; justify-content:space-between;">
             <button type="button" class="btn-text" onclick="closeModal()">Close</button>
             <button type="button" id="modalSaveBtn" onclick="saveExpense()">Save Item</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="settingsModal">
+    <div class="modal-content">
+        <h3 style="margin-top:0;">⚙️ Settings</h3>
+        <h4 style="margin-bottom:5px;">Email Notifications</h4>
+        <p style="font-size:0.8rem; color:var(--text-sub); margin-top:0;">
+            Add email addresses to be notified when items are scheduled for purchase.
+            <br><small>Note: Requires setup to send automatically.</small>
+        </p>
+
+        <div style="display:flex; gap:5px; margin-bottom:10px;">
+            <input type="email" id="newEmailInput" placeholder="family@email.com">
+            <button onclick="addNewEmail()">Add</button>
+        </div>
+
+        <div id="emailListContainer" style="margin-bottom:20px; max-height:150px; overflow-y:auto; border:1px solid var(--border); border-radius:8px;"></div>
+        
+        <div style="text-align:right;">
+            <button class="btn-text" onclick="closeSettings()">Done</button>
         </div>
     </div>
 </div>
@@ -343,7 +386,7 @@
     let unsubscribe = null; 
 
     // Initialize global immediately so UI doesn't crash on load
-    window.appData = { pending: [] };
+    window.appData = { pending: [], emailList: [] };
 
     // --- AUTH ---
     window.handleLogin = (e) => { e.preventDefault(); window.login(); };
@@ -388,8 +431,9 @@
             if (docSnap.exists()) {
                 window.appData = docSnap.data();
                 if (!window.appData.pending) window.appData.pending = [];
+                if (!window.appData.emailList) window.appData.emailList = [];
             } else {
-                window.appData = { pending: [] };
+                window.appData = { pending: [], emailList: [] };
             }
             window.refreshUI();
         });
@@ -428,6 +472,9 @@
         if(document.getElementById('expenseModal').classList.contains('active')) {
             window.renderModalList();
         }
+        if(document.getElementById('settingsModal').classList.contains('active')) {
+            window.renderEmailList();
+        }
     }
 </script>
 
@@ -456,12 +503,19 @@
         const amtInput = document.getElementById('pendingAmount');
         const descInput = document.getElementById('pendingDesc');
         const linkInput = document.getElementById('pendingLink');
+        const taxInput = document.getElementById('pendingTax');
         
-        const amt = parseFloat(amtInput.value);
+        let amt = parseFloat(amtInput.value);
         const desc = descInput.value || 'Item';
         const link = window.fixLink(linkInput.value);
 
         if (isNaN(amt) || amt <= 0) return;
+
+        // Apply Tax logic immediately
+        if(taxInput.checked) {
+            amt = amt * 1.1;
+            amt = Math.round(amt * 100) / 100; // Round to 2 decimals
+        }
 
         if (!window.appData.pending) window.appData.pending = [];
 
@@ -485,6 +539,7 @@
         }
         
         amtInput.value = ''; descInput.value = ''; linkInput.value = '';
+        taxInput.checked = false; // Reset tax check
         window.saveToCloud();
     };
 
@@ -493,6 +548,7 @@
         document.getElementById('pendingAmount').value = item.amount;
         document.getElementById('pendingDesc').value = item.desc;
         document.getElementById('pendingLink').value = item.link || '';
+        document.getElementById('pendingTax').checked = false; // Assume already taxed
         
         window.editingPendingIndex = idx;
         document.getElementById('addPendingBtn').textContent = "Update";
@@ -506,6 +562,7 @@
         document.getElementById('pendingAmount').value = '';
         document.getElementById('pendingDesc').value = '';
         document.getElementById('pendingLink').value = '';
+        document.getElementById('pendingTax').checked = false;
         document.getElementById('addPendingBtn').textContent = "Add to List";
         document.getElementById('cancelPendingEditBtn').style.display = 'none';
         window.renderPendingList();
@@ -538,7 +595,7 @@
             div.innerHTML = `
                 <div class="pending-top">
                     <span>${item.icon} ${item.desc} ${linkHtml}</span>
-                    <span>$${item.amount}</span>
+                    <span>$${item.amount.toFixed(2)}</span>
                 </div>
                 
                 <div class="pending-actions">
@@ -567,26 +624,22 @@
         }
     };
 
-    // Triggered by the Smart Schedule button
     window.commitPending = (idx, dateString) => {
         const targetDate = new Date(dateString);
         window.finalizeSchedule(idx, targetDate);
     };
 
-    // Triggered by the Manual "Move" button
     window.manualSchedule = (idx) => {
         const dateVal = document.getElementById(`manualDate-${idx}`).value;
         if(!dateVal) {
             alert("Please pick a date first.");
             return;
         }
-        // Create date from input string (YYYY-MM-DD) to ensure correct local date
         const parts = dateVal.split('-');
         const targetDate = new Date(parts[0], parts[1]-1, parts[2]);
         window.finalizeSchedule(idx, targetDate);
     }
 
-    // Common logic to move item from Pending -> Calendar
     window.finalizeSchedule = (idx, targetDate) => {
         const item = window.appData.pending[idx];
         const monthKey = window.getMonthKey(targetDate);
@@ -596,6 +649,7 @@
         if (!window.appData[monthKey].expenses) window.appData[monthKey].expenses = {};
         if (!window.appData[monthKey].expenses[day]) window.appData[monthKey].expenses[day] = [];
         
+        // Push the item as-is (tax is already inside item.amount)
         window.appData[monthKey].expenses[day].push({
             amount: item.amount,
             desc: item.desc,
@@ -606,11 +660,9 @@
         window.appData.pending.splice(idx, 1);
         window.saveToCloud();
         
-        // If date is in current view, refresh calendar
         if (targetDate.getMonth() === window.currentDate.getMonth()) {
             window.renderCalendar();
         } else {
-            // If moved to a different month, switch view to that month so user sees it
             window.currentDate = targetDate;
             window.renderCalendar();
         }
@@ -675,7 +727,6 @@
         if (window.appData[monthKey] && window.appData[monthKey].budget !== undefined) {
             budget = window.appData[monthKey].budget;
         } else {
-             // Fallback lookup
              let check = new Date(window.currentDate);
              for(let i=0; i<6; i++) {
                  check.setMonth(check.getMonth() - 1);
@@ -716,7 +767,7 @@
             cell.onclick = () => openModal(day);
 
             let chipsHtml = dayExpenses.map(e => 
-                `<div class="expense-chip">${e.icon} $${e.amount} ${e.link ? '🔗' : ''}</div>`
+                `<div class="expense-chip">${e.icon} $${e.amount.toFixed(2)} ${e.link ? '🔗' : ''}</div>`
             ).join('');
             
             const balClass = availableBalance >= 0 ? 'bal-pos' : 'bal-neg';
@@ -768,6 +819,7 @@
         document.getElementById('expenseAmount').value = '';
         document.getElementById('expenseDesc').value = '';
         document.getElementById('expenseLink').value = '';
+        document.getElementById('expenseTax').checked = false;
         document.getElementById('modalSaveBtn').textContent = "Save Item";
         window.editingExpenseIndex = -1;
         window.renderModalList(); // To remove active highlights
@@ -780,10 +832,11 @@
         document.getElementById('expenseAmount').value = item.amount;
         document.getElementById('expenseDesc').value = item.desc;
         document.getElementById('expenseLink').value = item.link || '';
+        document.getElementById('expenseTax').checked = false;
         
         window.editingExpenseIndex = index;
         document.getElementById('modalSaveBtn').textContent = "Update Item";
-        window.renderModalList(); // Highlight the item being edited
+        window.renderModalList(); 
     }
 
     window.renderModalList = () => {
@@ -803,7 +856,7 @@
             let linkIcon = ex.link ? `<a href="${ex.link}" target="_blank" onclick="event.stopPropagation()">🔗</a>` : '';
 
             row.innerHTML = `
-                <span>${ex.icon} <b>$${ex.amount}</b> ${ex.desc} ${linkIcon}</span>
+                <span>${ex.icon} <b>$${ex.amount.toFixed(2)}</b> ${ex.desc} ${linkIcon}</span>
                 <button class="btn-danger-outline btn-sm" onclick="event.stopPropagation(); deleteExpense(${index})">Delete</button>
             `;
             container.appendChild(row);
@@ -813,11 +866,22 @@
     window.closeModal = () => document.getElementById('expenseModal').classList.remove('active');
 
     window.saveExpense = () => {
-        const amount = parseFloat(document.getElementById('expenseAmount').value);
-        const desc = document.getElementById('expenseDesc').value || 'Expense';
-        const link = window.fixLink(document.getElementById('expenseLink').value);
+        const amtInput = document.getElementById('expenseAmount');
+        const descInput = document.getElementById('expenseDesc');
+        const linkInput = document.getElementById('expenseLink');
+        const taxInput = document.getElementById('expenseTax');
+
+        let amount = parseFloat(amtInput.value);
+        const desc = descInput.value || 'Expense';
+        const link = window.fixLink(linkInput.value);
         
         if (isNaN(amount)) return;
+
+        // Apply Tax logic
+        if(taxInput.checked) {
+            amount = amount * 1.1;
+            amount = Math.round(amount * 100) / 100;
+        }
 
         const monthKey = window.getMonthKey(window.currentDate);
         if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
@@ -852,6 +916,55 @@
         window.appData[monthKey].expenses[window.selectedDate].splice(index, 1);
         window.saveToCloud();
         window.renderModalList();
+    };
+
+    // --- SETTINGS (EMAIL LIST) ---
+    window.openSettings = () => {
+        window.renderEmailList();
+        document.getElementById('settingsModal').classList.add('active');
+    };
+    
+    window.closeSettings = () => {
+        document.getElementById('settingsModal').classList.remove('active');
+    };
+
+    window.addNewEmail = () => {
+        const input = document.getElementById('newEmailInput');
+        const email = input.value.trim();
+        if(email && email.includes('@')) {
+            if(!window.appData.emailList) window.appData.emailList = [];
+            window.appData.emailList.push(email);
+            window.saveToCloud();
+            input.value = '';
+            window.renderEmailList();
+        }
+    };
+
+    window.removeEmail = (idx) => {
+        if(confirm("Remove this email?")) {
+            window.appData.emailList.splice(idx, 1);
+            window.saveToCloud();
+            window.renderEmailList();
+        }
+    };
+
+    window.renderEmailList = () => {
+        const list = window.appData.emailList || [];
+        const container = document.getElementById('emailListContainer');
+        container.innerHTML = '';
+        if(list.length === 0) {
+            container.innerHTML = '<div style="padding:10px; color:#999; text-align:center;">No emails added.</div>';
+            return;
+        }
+        list.forEach((email, idx) => {
+            const div = document.createElement('div');
+            div.className = 'email-list-item';
+            div.innerHTML = `
+                <span>${email}</span>
+                <button class="btn-danger-outline btn-sm" onclick="removeEmail(${idx})">Remove</button>
+            `;
+            container.appendChild(div);
+        });
     };
 
 </script>
