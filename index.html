@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PaceBudget</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            color: #1e293b;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* Header & Controls */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        h1 { margin: 0; font-size: 1.5rem; }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        button:hover { opacity: 0.9; }
+        
+        input[type="number"] {
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            width: 100px;
+        }
+
+        /* Calendar Grid */
+        .calendar-header {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            font-weight: bold;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px; /* Creates borders */
+            background-color: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .day-cell {
+            background-color: var(--surface);
+            min-height: 120px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .day-cell:hover { background-color: #f1f5f9; }
+        
+        .day-cell.empty { background-color: #f8fafc; cursor: default; }
+
+        .date-number {
+            font-weight: bold;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .balance-indicator {
+            font-size: 0.85rem;
+            margin-top: auto;
+            padding: 4px;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .balance-positive { color: var(--success); background: #dcfce7; }
+        .balance-negative { color: var(--danger); background: #fee2e2; }
+
+        .expense-list {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 5px;
+            overflow-y: auto;
+            max-height: 50px;
+        }
+
+        /* Expense Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active { display: flex; }
+
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            width: 300px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal h3 { margin-top: 0; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-size: 0.9rem; }
+        .form-group input { width: 100%; box-sizing: border-box; }
+
+        .btn-secondary { background: #94a3b8; margin-right: 5px; }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="controls">
+            <button onclick="changeMonth(-1)">←</button>
+            <h2 id="currentMonthLabel" style="margin:0; min-width: 150px; text-align: center;"></h2>
+            <button onclick="changeMonth(1)">→</button>
+        </div>
+        <div class="controls">
+            <label>Monthly Budget: $</label>
+            <input type="number" id="budgetInput" onchange="updateBudget()" placeholder="0">
+        </div>
+    </header>
+
+    <div class="calendar-header">
+        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+    </div>
+    <div class="calendar-grid" id="calendarGrid"></div>
+</div>
+
+<div class="modal" id="expenseModal">
+    <div class="modal-content">
+        <h3 id="modalTitle">Add Expense</h3>
+        <div class="form-group">
+            <label>Amount ($)</label>
+            <input type="number" id="expenseAmount" step="0.01">
+        </div>
+        <div class="form-group">
+            <label>Description (Optional)</label>
+            <input type="text" id="expenseDesc">
+        </div>
+        <div style="text-align: right;">
+            <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+            <button onclick="saveExpense()">Save</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- State Management ---
+    let currentDate = new Date();
+    let selectedDate = null;
+    
+    // Data Structure: { "2023-10": { budget: 1000, expenses: { "5": [{amount: 10, desc: "Coffee"}] } } }
+    let appData = JSON.parse(localStorage.getItem('paceBudget_data')) || {};
+
+    function getMonthKey(date) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    function saveData() {
+        localStorage.setItem('paceBudget_data', JSON.stringify(appData));
+        renderCalendar();
+    }
+
+    // --- Core Logic ---
+    function renderCalendar() {
+        const grid = document.getElementById('calendarGrid');
+        grid.innerHTML = '';
+        
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const monthKey = getMonthKey(currentDate);
+
+        // Update Header
+        document.getElementById('currentMonthLabel').textContent = 
+            currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        
+        // Ensure data object exists for this month
+        if (!appData[monthKey]) {
+            appData[monthKey] = { budget: 0, expenses: {} };
+        }
+        document.getElementById('budgetInput').value = appData[monthKey].budget;
+
+        // Calendar Math
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const dailyPace = appData[monthKey].budget / daysInMonth;
+
+        // Empty cells for previous month
+        for (let i = 0; i < firstDay; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'day-cell empty';
+            grid.appendChild(cell);
+        }
+
+        // Days
+        let cumulativeSpend = 0;
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const cell = document.createElement('div');
+            cell.className = 'day-cell';
+            cell.onclick = () => openModal(day);
+
+            // Calculate Metrics
+            const dayExpenses = appData[monthKey].expenses[day] || [];
+            const daySpendTotal = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
+            cumulativeSpend += daySpendTotal;
+
+            // "Paced" Logic: By day X, you should have accrued X * dailyPace
+            const accruedBudget = dailyPace * day;
+            const availableBalance = accruedBudget - cumulativeSpend;
+
+            // HTML Content
+            let expenseHtml = dayExpenses.map(e => `<div>-$${e.amount} ${e.desc}</div>`).join('');
+            
+            const balanceClass = availableBalance >= 0 ? 'balance-positive' : 'balance-negative';
+            const balanceText = appData[monthKey].budget > 0 
+                ? `$${availableBalance.toFixed(0)}` 
+                : '-';
+
+            cell.innerHTML = `
+                <div class="date-number">
+                    <span>${day}</span>
+                    <span style="font-size:0.7em; color:#94a3b8">$${daySpendTotal > 0 ? daySpendTotal : ''}</span>
+                </div>
+                <div class="expense-list">${expenseHtml}</div>
+                <div class="balance-indicator ${balanceClass}">
+                    Avail: ${balanceText}
+                </div>
+            `;
+            grid.appendChild(cell);
+        }
+    }
+
+    // --- User Actions ---
+    function changeMonth(delta) {
+        currentDate.setMonth(currentDate.getMonth() + delta);
+        renderCalendar();
+    }
+
+    function updateBudget() {
+        const val = parseFloat(document.getElementById('budgetInput').value);
+        const monthKey = getMonthKey(currentDate);
+        if (!appData[monthKey]) appData[monthKey] = { expenses: {} };
+        appData[monthKey].budget = val;
+        saveData();
+    }
+
+    function openModal(day) {
+        selectedDate = day;
+        document.getElementById('modalTitle').textContent = `Add Expense for ${currentDate.toLocaleString('default', { month: 'short' })} ${day}`;
+        document.getElementById('expenseAmount').value = '';
+        document.getElementById('expenseDesc').value = '';
+        document.getElementById('expenseModal').classList.add('active');
+        document.getElementById('expenseAmount').focus();
+    }
+
+    function closeModal() {
+        document.getElementById('expenseModal').classList.remove('active');
+    }
+
+    function saveExpense() {
+        const amount = parseFloat(document.getElementById('expenseAmount').value);
+        const desc = document.getElementById('expenseDesc').value;
+        
+        if (isNaN(amount)) return;
+
+        const monthKey = getMonthKey(currentDate);
+        if (!appData[monthKey].expenses[selectedDate]) {
+            appData[monthKey].expenses[selectedDate] = [];
+        }
+
+        appData[monthKey].expenses[selectedDate].push({
+            amount: amount,
+            desc: desc
+        });
+
+        saveData();
+        closeModal();
+    }
+
+    // Initialize
+    renderCalendar();
+
+</script>
+</body>
+</html>
