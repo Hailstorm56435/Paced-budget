@@ -304,7 +304,6 @@
     import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     // --- CONFIG ---
-    // IMPORTANT: Ignore GitHub secret scanning alerts. This is a client-side app.
     const firebaseConfig = {
       apiKey: "AIzaSyCdPwx5Gh3_7sjm5KkbX_4yURUFcqoPsC0",
       authDomain: "pacedbudget.firebaseapp.com",
@@ -320,8 +319,10 @@
     const db = getFirestore(app);
 
     let currentUser = null;
-    let appData = { pending: [] };
     let unsubscribe = null; 
+
+    // Initialize global immediately so UI doesn't crash on load
+    window.appData = { pending: [] };
 
     // --- AUTH ---
     window.handleLogin = (e) => { e.preventDefault(); window.login(); };
@@ -364,10 +365,11 @@
     function startDataListener(uid) {
         unsubscribe = onSnapshot(doc(db, "users", uid), (docSnap) => {
             if (docSnap.exists()) {
-                appData = docSnap.data();
-                if (!appData.pending) appData.pending = [];
+                // FIXED: Explicitly update the global window object
+                window.appData = docSnap.data();
+                if (!window.appData.pending) window.appData.pending = [];
             } else {
-                appData = { pending: [] };
+                window.appData = { pending: [] };
             }
             window.refreshUI();
             window.checkForTodayAlerts();
@@ -376,7 +378,10 @@
 
     window.saveToCloud = async () => {
         if (!currentUser) return;
-        try { await setDoc(doc(db, "users", currentUser.uid), appData); } 
+        try { 
+            // FIXED: Use window.appData to ensure we save what is on screen
+            await setDoc(doc(db, "users", currentUser.uid), window.appData); 
+        } 
         catch (e) { console.error(e); }
     }
 
@@ -391,9 +396,6 @@
         for (let k in map) { if (d.includes(k)) return map[k]; }
         return '💸';
     };
-    
-    // --- GLOBAL HELPERS ---
-    window.appData = appData;
     
     // Auto-fix links
     window.fixLink = (url) => {
@@ -419,6 +421,7 @@
     window.showHistory = false;
     window.editingPendingIndex = -1; // -1 means new, >=0 means editing
     window.editingExpenseIndex = -1; // For modal editing
+    window.hasCheckedAlerts = false; // Prevent spamming alerts
 
     window.getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
 
@@ -433,14 +436,11 @@
         const monthKey = window.getMonthKey(today);
         const day = today.getDate();
         
-        // Only run this once per session load to avoid annoying popups on every sync
         if(window.hasCheckedAlerts) return;
 
-        if(window.appData[monthKey] && window.appData[monthKey].expenses[day]) {
+        if(window.appData[monthKey] && window.appData[monthKey].expenses && window.appData[monthKey].expenses[day]) {
             const items = window.appData[monthKey].expenses[day];
             if(items.length > 0) {
-                 // Simple browser alert for "Low Tech" notification
-                 // setTimeout to let UI load first
                  setTimeout(() => {
                      alert(`📅 You have ${items.length} items scheduled for TODAY! \nTime to buy!`);
                  }, 1000);
@@ -500,6 +500,7 @@
         document.getElementById('addPendingBtn').textContent = "Update";
         document.getElementById('cancelPendingEditBtn').style.display = 'inline-block';
         window.renderPendingList(); // Re-render to show highlight
+        document.getElementById('pendingDrawer').classList.add('open');
     };
 
     window.cancelPendingEdit = () => {
@@ -565,6 +566,7 @@
         const day = targetDate.getDate();
         
         if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
+        if (!window.appData[monthKey].expenses) window.appData[monthKey].expenses = {};
         if (!window.appData[monthKey].expenses[day]) window.appData[monthKey].expenses[day] = [];
         
         window.appData[monthKey].expenses[day].push({
@@ -666,7 +668,7 @@
         let cumulativeSpend = 0;
 
         for (let day = 1; day <= daysInMonth; day++) {
-            const dayExpenses = window.appData[monthKey].expenses[day] || [];
+            const dayExpenses = (window.appData[monthKey].expenses && window.appData[monthKey].expenses[day]) ? window.appData[monthKey].expenses[day] : [];
             const daySpendTotal = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
             cumulativeSpend += daySpendTotal;
 
@@ -787,6 +789,7 @@
 
         const monthKey = window.getMonthKey(window.currentDate);
         if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
+        if (!window.appData[monthKey].expenses) window.appData[monthKey].expenses = {};
         if (!window.appData[monthKey].expenses[window.selectedDate]) {
             window.appData[monthKey].expenses[window.selectedDate] = [];
         }
