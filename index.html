@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PaceBudget (Smart Schedule)</title>
+    <title>PaceBudget</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -152,7 +152,7 @@
             justify-content: flex-end;
         }
 
-        /* CALENDAR GRID (Desktop) */
+        /* CALENDAR GRID */
         .calendar-header {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
@@ -214,7 +214,7 @@
             overflow: hidden;
         }
 
-        /* --- MOBILE VIEW --- */
+        /* MOBILE VIEW */
         @media (max-width: 600px) {
             .calendar-header { display: none; }
             
@@ -360,8 +360,7 @@
                 <input type="text" id="pendingDesc" placeholder="Desc" style="flex-grow:1;">
                 <button class="btn-sm" onclick="addPendingItem()">Add</button>
             </div>
-            <div id="pendingList" class="pending-list">
-                </div>
+            <div id="pendingList" class="pending-list"></div>
         </div>
 
         <div class="controls" style="margin-bottom: 20px;">
@@ -387,12 +386,32 @@
     <div id="loginPrompt">
         <h2>Family Login</h2>
         <p style="color:#64748b; margin-bottom:20px;">Log in to access shared budget.</p>
-        <input type="email" id="email" class="login-input" placeholder="Email">
-        <input type="password" id="password" class="login-input" placeholder="Password">
-        <div class="auth-actions">
-            <button onclick="login()">Login</button>
-            <button class="btn-outline" onclick="signup()">Sign Up</button>
-        </div>
+        
+        <form onsubmit="handleLogin(event)">
+            <input 
+                type="email" 
+                name="email" 
+                id="email" 
+                class="login-input" 
+                placeholder="Email" 
+                autocomplete="username" 
+                required>
+                
+            <input 
+                type="password" 
+                name="password" 
+                id="password" 
+                class="login-input" 
+                placeholder="Password" 
+                autocomplete="current-password" 
+                required>
+
+            <div class="auth-actions">
+                <button type="submit">Login</button>
+                <button type="button" class="btn-outline" onclick="signup()">Sign Up</button>
+            </div>
+        </form>
+        
         <div id="authError" class="error-msg"></div>
     </div>
 </div>
@@ -439,7 +458,12 @@
     let appData = { pending: [] };
     let unsubscribe = null; 
 
-    // AUTH
+    // AUTH HANDLERS
+    window.handleLogin = (event) => {
+        event.preventDefault(); // Prevent page reload
+        window.login();
+    };
+
     window.login = () => {
         const e = document.getElementById('email').value;
         const p = document.getElementById('password').value;
@@ -452,6 +476,11 @@
     window.signup = () => {
         const e = document.getElementById('email').value;
         const p = document.getElementById('password').value;
+        if(!e || !p) {
+            document.getElementById('authError').textContent = "Please enter email and password";
+            document.getElementById('authError').style.display = 'block';
+            return;
+        }
         createUserWithEmailAndPassword(auth, e, p).catch(err => {
             document.getElementById('authError').textContent = err.message;
             document.getElementById('authError').style.display = 'block';
@@ -525,11 +554,9 @@
 
     // --- LOGIC: Find Best Date ---
     window.findNextAffordableDate = function(amount) {
-        // Start looking from TODAY (reset to midnight)
         let checkDate = new Date();
         checkDate.setHours(0,0,0,0);
         
-        // Safety Break: Stop checking after 60 days to prevent infinite loops if budget is 0
         const maxChecks = 60;
         let checks = 0;
 
@@ -537,9 +564,7 @@
             const monthKey = window.getMonthKey(checkDate);
             const budget = window.getEffectiveBudget(checkDate);
             
-            // If budget is 0 or undefined, we can't afford anything ever in this month
             if (budget <= 0) {
-                // Skip to next month
                 checkDate.setDate(1);
                 checkDate.setMonth(checkDate.getMonth() + 1);
                 checks++;
@@ -550,10 +575,8 @@
             const daysInMonth = new Date(checkDate.getFullYear(), checkDate.getMonth() + 1, 0).getDate();
             const dailyPace = budget / daysInMonth;
             
-            // Calculate spend ONLY for this month (Fresh start rule)
             let spentThisMonth = 0;
             if (window.appData[monthKey] && window.appData[monthKey].expenses) {
-                // Sum expenses up to AND INCLUDING this day
                 for (let d = 1; d <= day; d++) {
                     const dayEx = window.appData[monthKey].expenses[d] || [];
                     spentThisMonth += dayEx.reduce((sum, e) => sum + e.amount, 0);
@@ -563,18 +586,14 @@
             const accruedBudget = dailyPace * day;
             const availableBalance = accruedBudget - spentThisMonth;
 
-            // Does adding the expense keep us above zero (or at least afford it relative to accrued)?
-            // Note: If balance is already negative, we definitely can't afford it.
             if (availableBalance >= amount) {
-                return new Date(checkDate); // FOUND IT!
+                return new Date(checkDate);
             }
 
-            // Move to next day
             checkDate.setDate(checkDate.getDate() + 1);
             checks++;
         }
-        
-        return null; // Could not find a date
+        return null;
     }
 
     // --- PENDING INBOX ---
@@ -618,7 +637,6 @@
             const div = document.createElement('div');
             div.className = 'pending-item';
             
-            // CALCULATE THE SMART DATE
             const suggestedDate = window.findNextAffordableDate(item.amount);
             let btnText = "Can't Afford";
             let btnClass = "btn-outline";
@@ -627,9 +645,8 @@
             if (suggestedDate) {
                 const isToday = suggestedDate.toDateString() === new Date().toDateString();
                 const dateStr = suggestedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                
                 btnText = isToday ? "Move to Today" : `Schedule: ${dateStr}`;
-                btnClass = "btn-success"; // Green button for good dates
+                btnClass = "btn-success";
                 dateToUse = suggestedDate.toISOString();
             }
 
@@ -676,7 +693,7 @@
         window.saveToCloud();
     };
 
-    // --- CALENDAR LOGIC (Standard) ---
+    // --- CALENDAR LOGIC ---
     window.getEffectiveBudget = (date) => {
         const targetKey = window.getMonthKey(date);
         if (window.appData[targetKey] && window.appData[targetKey].budget !== undefined) {
