@@ -2,79 +2,104 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PaceBudget</title>
     <style>
         :root {
             --primary: #2563eb;
             --success: #16a34a;
             --danger: #dc2626;
-            --bg: #f8fafc;
+            --bg: #f1f5f9;
             --surface: #ffffff;
             --border: #e2e8f0;
+            --text-main: #0f172a;
             --text-sub: #64748b;
         }
 
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg);
             margin: 0;
             padding: 15px;
-            color: #1e293b;
-            padding-bottom: 80px;
+            padding-bottom: 100px; /* Space for scrolling past bottom */
+            color: var(--text-main);
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 900px;
             margin: 0 auto;
         }
 
-        /* Header & Controls */
+        /* --- HEADER & NAV --- */
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-            gap: 10px;
+            margin-bottom: 20px;
         }
 
         #userDisplay {
-            font-size: 0.85rem;
-            font-weight: 500;
             display: none; 
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            font-size: 0.9rem;
         }
 
         .controls {
+            background: var(--surface);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
             display: flex;
-            gap: 5px;
-            align-items: center;
-            flex-wrap: wrap;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .top-controls-row {
+            display: flex;
             justify-content: space-between;
-            width: 100%;
+            align-items: center;
         }
 
         .month-nav {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 15px;
+        }
+        
+        .month-nav h2 {
+            margin: 0;
+            font-size: 1.1rem;
+            min-width: 120px;
+            text-align: center;
         }
 
+        .budget-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+        }
+
+        /* --- BUTTONS & INPUTS --- */
         button {
             background: var(--primary);
             color: white;
             border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
+            padding: 10px 16px; /* Larger touch target */
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
             cursor: pointer;
-            font-weight: 500;
-            font-size: 0.9rem;
-            transition: opacity 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        button:hover { opacity: 0.9; }
+        button:active { opacity: 0.8; transform: scale(0.98); }
         
         button.btn-outline {
             background: transparent;
@@ -82,85 +107,80 @@
             color: var(--primary);
         }
 
-        button.btn-success {
-            background: var(--success);
-            color: white;
+        button.btn-text {
+            background: transparent;
+            color: var(--text-sub);
+            padding: 5px;
         }
 
-        button.btn-sm {
-            padding: 4px 8px;
-            font-size: 0.75rem;
-        }
+        button.btn-success { background: var(--success); }
+        button.btn-danger { background: var(--danger); }
+        button.btn-sm { padding: 6px 12px; font-size: 0.8rem; }
 
         input {
-            padding: 8px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 1rem;
-        }
-
-        input[type="number"] { width: 80px; }
-
-        /* PENDING DRAWER STYLES */
-        .pending-drawer {
-            background: white;
+            padding: 10px;
             border: 1px solid var(--border);
             border-radius: 8px;
+            font-size: 1rem; /* Prevents iOS zoom */
+            background: #fff;
+        }
+
+        /* --- INBOX / PENDING DRAWER --- */
+        #inboxBtn { width: 100%; text-align: left; margin-bottom: 10px; justify-content: space-between; }
+
+        .pending-drawer {
+            background: var(--surface);
+            border-radius: 12px;
             margin-bottom: 20px;
             overflow: hidden;
             display: none;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
         
-        .pending-drawer.open { display: block; }
+        .pending-drawer.open { display: block; animation: slideDown 0.2s ease-out; }
 
-        .pending-header {
-            padding: 10px 15px;
-            background: #f1f5f9;
-            font-weight: bold;
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .pending-input-row {
+            padding: 15px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border);
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            gap: 8px;
         }
 
         .pending-list {
-            padding: 15px;
+            padding: 0;
             max-height: 300px;
             overflow-y: auto;
         }
 
         .pending-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
             display: flex;
             flex-direction: column;
-            padding: 10px;
-            border-bottom: 1px solid var(--border);
             gap: 8px;
-            background: #fff;
-        }
-        
-        .pending-info {
-            display: flex; 
-            justify-content: space-between;
-            align-items: center;
-            font-weight: 500;
         }
 
-        .pending-actions {
-            display: flex;
-            gap: 5px;
-            align-items: center;
-            justify-content: flex-end;
-        }
+        .pending-top { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
+        .pending-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
-        /* CALENDAR GRID */
+        /* --- CALENDAR GRID (DESKTOP DEFAULT) --- */
         .calendar-header {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
             text-align: center;
             font-weight: bold;
             color: var(--text-sub);
-            margin-bottom: 5px;
-            font-size: 0.9rem;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .calendar-grid {
@@ -169,211 +189,215 @@
             gap: 1px;
             background-color: var(--border);
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 12px;
             overflow: hidden;
         }
 
         .day-cell {
             background-color: var(--surface);
-            min-height: 100px;
-            padding: 6px;
+            min-height: 110px;
+            padding: 8px;
             display: flex;
             flex-direction: column;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background 0.1s;
         }
 
-        .day-cell.today { background-color: #eff6ff; border: 2px solid var(--primary); }
         .day-cell:hover { background-color: #f8fafc; }
-        .day-cell.empty { background-color: #f8fafc; cursor: default; }
-
-        .date-number {
-            font-weight: bold;
-            margin-bottom: 4px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.9rem;
-        }
+        .day-cell.today { background-color: #eff6ff; }
+        
+        .date-number { font-weight: 700; display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .day-weekday { display: none; } /* Hidden on desktop */
+        
+        .expense-chips { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; }
+        .expense-chip { font-size: 0.75rem; color: var(--text-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .balance-indicator {
-            font-size: 0.75rem;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-align: right;
             margin-top: auto;
-            padding: 2px 4px;
-            border-radius: 4px;
-            text-align: center;
-            font-weight: 600;
+            padding: 2px 0;
         }
+        .bal-pos { color: var(--success); }
+        .bal-neg { color: var(--danger); }
 
-        .balance-positive { color: var(--success); background: #dcfce7; }
-        .balance-negative { color: var(--danger); background: #fee2e2; }
-
-        .expense-list {
-            font-size: 0.7rem;
-            color: var(--text-sub);
-            margin-top: 2px;
-            overflow: hidden;
-        }
-
-        /* MOBILE VIEW */
+        /* --- MOBILE OPTIMIZATION (THE STREAMLINED VIEW) --- */
         @media (max-width: 600px) {
+            body { padding: 10px; }
+            .container { max-width: 100%; }
+            
+            /* Hide Desktop Headers */
             .calendar-header { display: none; }
             
+            /* Transform Grid to List */
             .calendar-grid {
                 display: flex;
                 flex-direction: column;
-                gap: 10px;
+                gap: 0;
                 background: transparent;
                 border: none;
+                border-radius: 0;
             }
 
             .day-cell {
-                border-radius: 8px;
-                border: 1px solid var(--border);
-                min-height: auto;
+                min-height: 60px; /* Compact rows */
+                border-bottom: 1px solid var(--border);
                 flex-direction: row;
                 align-items: center;
-                justify-content: space-between;
-                padding: 12px;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                border-radius: 0;
+                padding: 12px 5px;
             }
             
-            .day-cell.empty { display: none; }
+            .day-cell.empty { display: none; } /* Hide filler days */
 
+            /* Date Column (Left) */
             .date-number {
+                flex-direction: column-reverse;
+                align-items: center;
+                justify-content: center;
+                width: 50px;
+                min-width: 50px;
                 margin-bottom: 0;
-                width: 40px;
-                flex-direction: column;
-                align-items: flex-start;
-                font-size: 1.1rem;
-            }
-            
-            .date-number span:nth-child(2) { display: none; }
-
-            .expense-list {
-                flex-grow: 1;
-                margin: 0 10px;
-                display: flex;
-                flex-wrap: wrap;
-                gap: 5px;
-                max-height: none;
-            }
-            
-            .expense-list div {
                 background: #f1f5f9;
-                padding: 2px 6px;
-                border-radius: 4px;
+                border-radius: 8px;
+                padding: 6px 0;
+                margin-right: 12px;
+                height: 44px;
+            }
+            .date-number span:last-child { font-size: 1.2rem; line-height: 1; color: var(--text-main); } /* The Number */
+            .day-weekday { display: block; font-size: 0.65rem; text-transform: uppercase; color: var(--text-sub); line-height: 1; } /* The Day Name */
+            
+            .day-cell.today .date-number { background: var(--primary); color: white; }
+            .day-cell.today .day-weekday { color: rgba(255,255,255,0.8); }
+
+            /* Middle Section (Expenses) */
+            .expense-chips {
+                flex-direction: row;
+                flex-wrap: wrap;
+                gap: 6px;
+                align-content: center;
+            }
+            
+            .expense-chip {
+                background: #f1f5f9;
+                padding: 2px 8px;
+                border-radius: 10px;
                 font-size: 0.8rem;
+                display: flex;
+                align-items: center;
             }
 
+            /* Right Section (Balance) */
             .balance-indicator {
                 margin-top: 0;
-                min-width: 60px;
+                font-size: 0.95rem;
+                min-width: 70px;
             }
         }
 
+        /* --- MODAL --- */
         .modal {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.6);
             align-items: center;
             justify-content: center;
-            z-index: 1000;
+            z-index: 2000;
+            backdrop-filter: blur(2px);
         }
-
         .modal.active { display: flex; }
 
         .modal-content {
             background: white;
-            padding: 24px;
-            border-radius: 12px;
+            padding: 25px;
+            border-radius: 16px;
             width: 90%;
-            max-width: 320px;
+            max-width: 350px;
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-size: 0.9rem; }
-        .form-group input { width: 100%; box-sizing: border-box; }
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-        .btn-secondary { background: #94a3b8; margin-right: 5px; }
-        .btn-danger { background: var(--danger); }
-        
-        .item-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #f1f5f9;
-            padding: 8px;
-            border-radius: 4px;
-            margin-bottom: 6px;
-            font-size: 0.9rem;
-        }
-
+        /* --- LOGIN --- */
         #loginPrompt {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
             max-width: 400px;
             margin: 40px auto;
-            padding: 30px;
-            background: white;
-            border-radius: 12px;
-            text-align: center;
-            display: none;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
         }
         
-        .login-input { width: 100%; margin-bottom: 10px; box-sizing: border-box; }
-        .auth-actions { display: flex; gap: 10px; margin-top: 10px; }
-        .auth-actions button { flex: 1; }
-        .error-msg { color: var(--danger); font-size: 0.9rem; margin-top: 10px; display: none; }
+        .login-input { width: 100%; margin-bottom: 12px; padding: 12px; }
+        .auth-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+        .auth-actions button { width: 100%; }
+        
         #appContent { display: none; }
-
     </style>
 </head>
 <body>
 
-<div id="loadingOverlay">Loading...</div>
+<div id="loadingOverlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:9999; display:flex; justify-content:center; align-items:center;">
+    Loading PaceBudget...
+</div>
 
 <div class="container">
     <header>
-        <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
-             <h1 id="appTitle" style="display:none;">PaceBudget</h1>
-             <div id="userDisplay">
-                <span id="userEmail"></span>
-                <button class="btn-outline btn-sm" onclick="logout()">Sign Out</button>
-            </div>
+        <h1 style="margin:0; font-size:1.2rem; font-weight:800; color:var(--primary);">PaceBudget</h1>
+        <div id="userDisplay">
+            <span id="userEmail" style="color:var(--text-sub);"></span>
+            <button class="btn-text" onclick="logout()">Sign Out</button>
         </div>
     </header>
 
+    <div id="loginPrompt" style="display:none;">
+        <h2 style="margin-top:0;">Family Login</h2>
+        <p style="color:var(--text-sub); margin-bottom:20px;">Shared budget access.</p>
+        
+        <form onsubmit="handleLogin(event)">
+            <input type="email" name="email" id="email" class="login-input" placeholder="Email" autocomplete="username" required>
+            <input type="password" name="password" id="password" class="login-input" placeholder="Password" autocomplete="current-password" required>
+            <div class="auth-actions">
+                <button type="submit">Log In</button>
+                <button type="button" class="btn-outline" onclick="signup()">Create Account</button>
+            </div>
+        </form>
+        <div id="authError" style="color:var(--danger); margin-top:10px; font-size:0.9rem; display:none;"></div>
+    </div>
+
     <div id="appContent">
         
-        <div style="margin-bottom: 10px; display: flex; justify-content: space-between;">
-            <button class="btn-outline" onclick="toggleInbox()" id="inboxBtn">📥 Inbox (0)</button>
+        <div class="controls">
+            <div class="top-controls-row">
+                <div class="month-nav">
+                    <button class="btn-outline btn-sm" onclick="changeMonth(-1)">←</button>
+                    <h2 id="currentMonthLabel"></h2>
+                    <button class="btn-outline btn-sm" onclick="changeMonth(1)">→</button>
+                </div>
+            </div>
+            
+            <div class="budget-row">
+                <span style="flex-grow:1;">Total Monthly Budget:</span>
+                <input type="number" id="budgetInput" onchange="updateBudget()" placeholder="0" style="width:100px; text-align:right;">
+            </div>
+
+            <button class="btn-outline" onclick="toggleInbox()" id="inboxBtn">
+                <span>📥 Unscheduled Inbox</span>
+                <span id="inboxCount" style="background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">0</span>
+            </button>
         </div>
 
         <div id="pendingDrawer" class="pending-drawer">
-            <div class="pending-header">
-                <span>Pending Expenses</span>
-                <button class="btn-sm btn-secondary" onclick="toggleInbox()">Close</button>
-            </div>
-            <div style="padding: 15px; border-bottom: 1px solid var(--border); display:flex; gap:5px;">
-                <input type="number" id="pendingAmount" placeholder="$" style="width: 80px;">
-                <input type="text" id="pendingDesc" placeholder="Desc" style="flex-grow:1;">
-                <button class="btn-sm" onclick="addPendingItem()">Add</button>
+            <div class="pending-input-row">
+                <input type="number" id="pendingAmount" placeholder="$" style="width: 80px;" onkeypress="handlePendingEnter(event)">
+                <input type="text" id="pendingDesc" placeholder="Description" style="flex-grow:1;" onkeypress="handlePendingEnter(event)">
+                <button type="button" onclick="addPendingItem()">Add</button>
             </div>
             <div id="pendingList" class="pending-list"></div>
-        </div>
-
-        <div class="controls" style="margin-bottom: 20px;">
-            <div class="month-nav">
-                <button onclick="changeMonth(-1)">←</button>
-                <h2 id="currentMonthLabel" style="margin:0; min-width: 140px; text-align: center; font-size:1.1rem;"></h2>
-                <button onclick="changeMonth(1)">→</button>
-            </div>
-            
-            <div style="display:flex; align-items:center; gap:5px;">
-                <label style="font-size:0.9rem;">Budget:</label>
-                <input type="number" id="budgetInput" onchange="updateBudget()" placeholder="0">
-            </div>
         </div>
 
         <div class="calendar-header">
@@ -382,55 +406,27 @@
         
         <div class="calendar-grid" id="calendarGrid"></div>
     </div>
-
-    <div id="loginPrompt">
-        <h2>Family Login</h2>
-        <p style="color:#64748b; margin-bottom:20px;">Log in to access shared budget.</p>
-        
-        <form onsubmit="handleLogin(event)">
-            <input 
-                type="email" 
-                name="email" 
-                id="email" 
-                class="login-input" 
-                placeholder="Email" 
-                autocomplete="username" 
-                required>
-                
-            <input 
-                type="password" 
-                name="password" 
-                id="password" 
-                class="login-input" 
-                placeholder="Password" 
-                autocomplete="current-password" 
-                required>
-
-            <div class="auth-actions">
-                <button type="submit">Login</button>
-                <button type="button" class="btn-outline" onclick="signup()">Sign Up</button>
-            </div>
-        </form>
-        
-        <div id="authError" class="error-msg"></div>
-    </div>
 </div>
 
 <div class="modal" id="expenseModal">
     <div class="modal-content">
-        <h3 id="modalTitle">Manage Expenses</h3>
-        <div id="existingExpensesList" class="existing-items" style="margin-bottom:15px; max-height:150px; overflow-y:auto;"></div>
-        <div class="form-group">
-            <label>Amount ($)</label>
-            <input type="number" id="expenseAmount" step="0.01" placeholder="0.00">
+        <h3 id="modalTitle" style="margin-top:0;">Add Expense</h3>
+        
+        <div id="existingExpensesList" style="margin-bottom:15px; max-height:150px; overflow-y:auto; background:#f8fafc; border-radius:8px;"></div>
+        
+        <div style="margin-bottom:15px;">
+            <label style="display:block; font-size:0.85rem; color:var(--text-sub); margin-bottom:5px;">Amount</label>
+            <input type="number" id="expenseAmount" step="0.01" placeholder="0.00" style="width:100%; font-size:1.2rem; padding:12px;" onkeypress="handleModalEnter(event)">
         </div>
-        <div class="form-group">
-            <label>Description (Optional)</label>
-            <input type="text" id="expenseDesc" placeholder="e.g., Coffee">
+        
+        <div style="margin-bottom:20px;">
+            <label style="display:block; font-size:0.85rem; color:var(--text-sub); margin-bottom:5px;">Description</label>
+            <input type="text" id="expenseDesc" placeholder="e.g. Lunch" style="width:100%;" onkeypress="handleModalEnter(event)">
         </div>
-        <div style="text-align: right; margin-top:20px;">
-            <button class="btn-secondary" onclick="closeModal()">Close</button>
-            <button onclick="saveExpense()">Add Expense</button>
+        
+        <div style="display:flex; justify-content:space-between;">
+            <button type="button" class="btn-text" onclick="closeModal()">Cancel</button>
+            <button type="button" onclick="saveExpense()">Save Item</button>
         </div>
     </div>
 </div>
@@ -440,6 +436,7 @@
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+    // --- CONFIG ---
     const firebaseConfig = {
       apiKey: "AIzaSyCdPwx5Gh3_7sjm5KkbX_4yURUFcqoPsC0",
       authDomain: "pacedbudget.firebaseapp.com",
@@ -458,52 +455,44 @@
     let appData = { pending: [] };
     let unsubscribe = null; 
 
-    // AUTH HANDLERS
-    window.handleLogin = (event) => {
-        event.preventDefault(); // Prevent page reload
-        window.login();
-    };
-
+    // --- AUTH LOGIC ---
+    window.handleLogin = (e) => { e.preventDefault(); window.login(); };
+    
     window.login = () => {
         const e = document.getElementById('email').value;
         const p = document.getElementById('password').value;
-        signInWithEmailAndPassword(auth, e, p).catch(err => {
-            document.getElementById('authError').textContent = err.message;
-            document.getElementById('authError').style.display = 'block';
-        });
+        signInWithEmailAndPassword(auth, e, p).catch(err => showError(err.message));
     };
 
     window.signup = () => {
         const e = document.getElementById('email').value;
         const p = document.getElementById('password').value;
-        if(!e || !p) {
-            document.getElementById('authError').textContent = "Please enter email and password";
-            document.getElementById('authError').style.display = 'block';
-            return;
-        }
-        createUserWithEmailAndPassword(auth, e, p).catch(err => {
-            document.getElementById('authError').textContent = err.message;
-            document.getElementById('authError').style.display = 'block';
-        });
+        if(!e || !p) return showError("Enter email & password");
+        createUserWithEmailAndPassword(auth, e, p).catch(err => showError(err.message));
     };
 
     window.logout = () => signOut(auth);
 
-    // DATA SYNC
+    function showError(msg) {
+        const el = document.getElementById('authError');
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+
+    // --- DATA SYNC ---
     onAuthStateChanged(auth, (user) => {
         document.getElementById('loadingOverlay').style.display = 'none';
         currentUser = user;
+        
         if (user) {
             document.getElementById('userDisplay').style.display = 'flex';
             document.getElementById('userEmail').textContent = user.email.split('@')[0];
             document.getElementById('appContent').style.display = 'block';
-            document.getElementById('appTitle').style.display = 'block';
             document.getElementById('loginPrompt').style.display = 'none';
             startDataListener(user.uid);
         } else {
             document.getElementById('userDisplay').style.display = 'none';
             document.getElementById('appContent').style.display = 'none';
-            document.getElementById('appTitle').style.display = 'none';
             document.getElementById('loginPrompt').style.display = 'block';
             if (unsubscribe) unsubscribe();
         }
@@ -517,11 +506,7 @@
             } else {
                 appData = { pending: [] };
             }
-            window.renderCalendar();
-            window.renderPendingList();
-            if(document.getElementById('expenseModal').classList.contains('active')) {
-                window.renderModalList();
-            }
+            window.refreshUI();
         });
     }
 
@@ -531,84 +516,59 @@
         catch (e) { console.error(e); }
     }
 
+    // --- EXPORTS TO GLOBAL ---
     window.getSmartIcon = (desc) => {
         if (!desc) return '💸';
         const d = desc.toLowerCase();
         const map = {
             'coffee':'☕','food':'🍔','groceries':'🛒','gas':'⛽','rent':'🏠',
             'gym':'💪','movie':'🎬','game':'🎮','dog':'🐕','bill':'📄','beer':'🍺',
-            'wine':'🍷','lunch':'🥪','dinner':'🍽️','amazon':'📦'
+            'wine':'🍷','lunch':'🥪','dinner':'🍽️','amazon':'📦', 'target':'🎯'
         };
         for (let k in map) { if (d.includes(k)) return map[k]; }
         return '💸';
     };
-
+    
+    // Accessor for Logic
     Object.defineProperty(window, 'appData', { get: () => appData, set: (val) => appData = val });
+
+    window.refreshUI = () => {
+        window.renderCalendar();
+        window.renderPendingList();
+        if(document.getElementById('expenseModal').classList.contains('active')) {
+            window.renderModalList();
+        }
+    }
 </script>
 
 <script>
-    // --- UTILITIES ---
+    // --- APP LOGIC ---
+
     window.currentDate = new Date();
     window.selectedDate = null;
     window.getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
 
-    // --- LOGIC: Find Best Date ---
-    window.findNextAffordableDate = function(amount) {
-        let checkDate = new Date();
-        checkDate.setHours(0,0,0,0);
-        
-        const maxChecks = 60;
-        let checks = 0;
-
-        while (checks < maxChecks) {
-            const monthKey = window.getMonthKey(checkDate);
-            const budget = window.getEffectiveBudget(checkDate);
-            
-            if (budget <= 0) {
-                checkDate.setDate(1);
-                checkDate.setMonth(checkDate.getMonth() + 1);
-                checks++;
-                continue;
-            }
-
-            const day = checkDate.getDate();
-            const daysInMonth = new Date(checkDate.getFullYear(), checkDate.getMonth() + 1, 0).getDate();
-            const dailyPace = budget / daysInMonth;
-            
-            let spentThisMonth = 0;
-            if (window.appData[monthKey] && window.appData[monthKey].expenses) {
-                for (let d = 1; d <= day; d++) {
-                    const dayEx = window.appData[monthKey].expenses[d] || [];
-                    spentThisMonth += dayEx.reduce((sum, e) => sum + e.amount, 0);
-                }
-            }
-
-            const accruedBudget = dailyPace * day;
-            const availableBalance = accruedBudget - spentThisMonth;
-
-            if (availableBalance >= amount) {
-                return new Date(checkDate);
-            }
-
-            checkDate.setDate(checkDate.getDate() + 1);
-            checks++;
-        }
-        return null;
-    }
-
-    // --- PENDING INBOX ---
+    // --- INBOX LOGIC ---
     window.toggleInbox = () => {
         const d = document.getElementById('pendingDrawer');
         const open = d.classList.toggle('open');
-        if(open) document.getElementById('pendingAmount').focus();
+        if(open) setTimeout(() => document.getElementById('pendingAmount').focus(), 100);
+    };
+
+    window.handlePendingEnter = (e) => {
+        if(e.key === 'Enter') window.addPendingItem();
     };
 
     window.addPendingItem = () => {
-        const amt = parseFloat(document.getElementById('pendingAmount').value);
-        const desc = document.getElementById('pendingDesc').value || 'Pending Item';
+        const amtInput = document.getElementById('pendingAmount');
+        const descInput = document.getElementById('pendingDesc');
+        const amt = parseFloat(amtInput.value);
+        const desc = descInput.value || 'Item';
+
         if (isNaN(amt) || amt <= 0) return;
 
         if (!window.appData.pending) window.appData.pending = [];
+        
         window.appData.pending.push({
             amount: amt,
             desc: desc,
@@ -616,20 +576,22 @@
             addedAt: new Date().toISOString()
         });
         
-        document.getElementById('pendingAmount').value = '';
-        document.getElementById('pendingDesc').value = '';
-        document.getElementById('pendingAmount').focus();
+        // Reset and Refocus
+        amtInput.value = '';
+        descInput.value = '';
+        amtInput.focus();
+        
         window.saveToCloud();
     };
 
     window.renderPendingList = () => {
         const list = document.getElementById('pendingList');
         const count = window.appData.pending ? window.appData.pending.length : 0;
-        document.getElementById('inboxBtn').textContent = `📥 Inbox (${count})`;
+        document.getElementById('inboxCount').textContent = count;
         
         list.innerHTML = '';
         if(count === 0) {
-            list.innerHTML = '<div style="color:#ccc; font-style:italic;">No pending items</div>';
+            list.innerHTML = '<div style="padding:15px; text-align:center; color:var(--text-sub); font-size:0.9rem;">Inbox is empty.<br>Add unscheduled items above.</div>';
             return;
         }
 
@@ -637,31 +599,26 @@
             const div = document.createElement('div');
             div.className = 'pending-item';
             
+            // Solver Logic
             const suggestedDate = window.findNextAffordableDate(item.amount);
-            let btnText = "Can't Afford";
-            let btnClass = "btn-outline";
-            let dateToUse = null;
-
+            let btnHtml = '';
+            
             if (suggestedDate) {
-                const isToday = suggestedDate.toDateString() === new Date().toDateString();
                 const dateStr = suggestedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                btnText = isToday ? "Move to Today" : `Schedule: ${dateStr}`;
-                btnClass = "btn-success";
-                dateToUse = suggestedDate.toISOString();
+                const iso = suggestedDate.toISOString();
+                btnHtml = `<button class="btn-success btn-sm" onclick="commitPending(${idx}, '${iso}')">Schedule ${dateStr}</button>`;
+            } else {
+                btnHtml = `<button class="btn-outline btn-sm" disabled style="opacity:0.5;">Budget Tight</button>`;
             }
 
             div.innerHTML = `
-                <div class="pending-info">
+                <div class="pending-top">
                     <span>${item.icon} ${item.desc}</span>
-                    <span style="font-size:1.1rem;">$${item.amount}</span>
+                    <span>$${item.amount}</span>
                 </div>
                 <div class="pending-actions">
-                    <button class="btn-sm btn-danger" onclick="deletePending(${idx})">Delete</button>
-                    <button class="btn-sm ${btnClass}" 
-                        ${!suggestedDate ? 'disabled' : ''} 
-                        onclick="commitPending(${idx}, '${dateToUse}')">
-                        ${btnText}
-                    </button>
+                    <button class="btn-danger btn-sm" onclick="deletePending(${idx})">Delete</button>
+                    ${btnHtml}
                 </div>
             `;
             list.appendChild(div);
@@ -669,7 +626,6 @@
     };
 
     window.commitPending = (idx, dateString) => {
-        if (!dateString) return;
         const targetDate = new Date(dateString);
         const item = window.appData.pending[idx];
         const monthKey = window.getMonthKey(targetDate);
@@ -686,6 +642,11 @@
         
         window.appData.pending.splice(idx, 1);
         window.saveToCloud();
+        
+        // If we scheduled into the current month, force refresh
+        if (targetDate.getMonth() === window.currentDate.getMonth()) {
+            window.renderCalendar();
+        }
     };
 
     window.deletePending = (idx) => {
@@ -693,23 +654,51 @@
         window.saveToCloud();
     };
 
-    // --- CALENDAR LOGIC ---
-    window.getEffectiveBudget = (date) => {
-        const targetKey = window.getMonthKey(date);
-        if (window.appData[targetKey] && window.appData[targetKey].budget !== undefined) {
-            return window.appData[targetKey].budget;
-        }
-        let checkDate = new Date(date);
-        for(let i=0; i<12; i++) {
-            checkDate.setMonth(checkDate.getMonth() - 1);
-            const key = window.getMonthKey(checkDate);
-            if (window.appData[key] && window.appData[key].budget !== undefined) {
-                return window.appData[key].budget;
+    // --- SOLVER LOGIC ---
+    window.findNextAffordableDate = function(amount) {
+        let checkDate = new Date(); // Start Today
+        checkDate.setHours(0,0,0,0);
+        
+        const currentBud = parseFloat(document.getElementById('budgetInput').value) || 0;
+        if(currentBud <= 0) return null; // No budget set
+
+        const maxChecks = 45; // Look ahead 45 days
+        let checks = 0;
+
+        while (checks < maxChecks) {
+            const monthKey = window.getMonthKey(checkDate);
+            // Get budget for that specific month (or fallback to current input if logic fails)
+            let budget = 0;
+            if(window.appData[monthKey] && window.appData[monthKey].budget) {
+                budget = window.appData[monthKey].budget;
+            } else {
+                // If checking future month with no data, assume same budget as today
+                budget = currentBud;
             }
+
+            const day = checkDate.getDate();
+            const daysInMonth = new Date(checkDate.getFullYear(), checkDate.getMonth() + 1, 0).getDate();
+            const dailyPace = budget / daysInMonth;
+            
+            // Calc spent
+            let spent = 0;
+            if (window.appData[monthKey] && window.appData[monthKey].expenses) {
+                for (let d = 1; d <= day; d++) {
+                    const dayEx = window.appData[monthKey].expenses[d] || [];
+                    spent += dayEx.reduce((sum, e) => sum + e.amount, 0);
+                }
+            }
+
+            const bal = (dailyPace * day) - spent;
+            if (bal >= amount) return new Date(checkDate);
+
+            checkDate.setDate(checkDate.getDate() + 1);
+            checks++;
         }
-        return 0;
+        return null;
     }
 
+    // --- CALENDAR RENDERER ---
     window.renderCalendar = () => {
         const grid = document.getElementById('calendarGrid');
         grid.innerHTML = '';
@@ -723,15 +712,32 @@
         document.getElementById('currentMonthLabel').textContent = 
             window.currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         
-        const currentBudget = window.getEffectiveBudget(window.currentDate);
-        document.getElementById('budgetInput').value = currentBudget;
+        // Get Budget
+        let budget = 0;
+        if (window.appData[monthKey] && window.appData[monthKey].budget !== undefined) {
+            budget = window.appData[monthKey].budget;
+        } else {
+             // Look back logic
+             let check = new Date(window.currentDate);
+             for(let i=0; i<6; i++) {
+                 check.setMonth(check.getMonth() - 1);
+                 const k = window.getMonthKey(check);
+                 if (window.appData[k] && window.appData[k].budget) {
+                     budget = window.appData[k].budget;
+                     break;
+                 }
+             }
+        }
+        document.getElementById('budgetInput').value = budget > 0 ? budget : '';
 
+        // Init data structure
         if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
 
-        const firstDay = new Date(year, month, 1).getDay();
+        const firstDay = new Date(year, month, 1).getDay(); // 0 = Sun
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const dailyPace = currentBudget / daysInMonth;
+        const dailyPace = budget / daysInMonth;
 
+        // Spacers (Desktop only)
         for (let i = 0; i < firstDay; i++) {
             const cell = document.createElement('div');
             cell.className = 'day-cell empty';
@@ -754,25 +760,26 @@
             const accruedBudget = dailyPace * day;
             const availableBalance = accruedBudget - cumulativeSpend;
 
-            let expenseHtml = dayExpenses.map(e => 
-                `<div>${e.icon} -$${e.amount}</div>`
+            // Generate Chips
+            let chipsHtml = dayExpenses.map(e => 
+                `<div class="expense-chip">${e.icon} $${e.amount}</div>`
             ).join('');
             
-            const balanceClass = availableBalance >= 0 ? 'balance-positive' : 'balance-negative';
-            const balanceText = currentBudget > 0 ? `$${availableBalance.toFixed(0)}` : '-';
-            const dayName = new Date(year, month, day).toLocaleDateString('en-US', { weekday: 'short' });
+            const balClass = availableBalance >= 0 ? 'bal-pos' : 'bal-neg';
+            const balText = budget > 0 ? `$${Math.round(availableBalance)}` : '-';
+            
+            // Date formatting
+            const dateObj = new Date(year, month, day);
+            const weekday = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
 
             cell.innerHTML = `
                 <div class="date-number">
-                    <div>
-                        <span style="font-size:0.7em; color:#94a3b8; display:block;">${dayName}</span>
-                        <span>${day}</span>
-                    </div>
-                    <span style="font-size:0.8em; color:#94a3b8">$${daySpendTotal > 0 ? daySpendTotal : ''}</span>
+                    <span class="day-weekday">${weekday}</span>
+                    <span>${day}</span>
                 </div>
-                <div class="expense-list">${expenseHtml}</div>
-                <div class="balance-indicator ${balanceClass}">
-                    ${balanceText}
+                <div class="expense-chips">${chipsHtml}</div>
+                <div class="balance-indicator ${balClass}">
+                    ${balText}
                 </div>
             `;
             grid.appendChild(cell);
@@ -790,37 +797,41 @@
         if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
         window.appData[monthKey].budget = val;
         window.saveToCloud();
+        window.renderCalendar(); // Re-render to update balances immediately
     };
+
+    // --- MODAL LOGIC ---
+    window.handleModalEnter = (e) => {
+        if(e.key === 'Enter') window.saveExpense();
+    }
 
     window.openModal = (day) => {
         window.selectedDate = day;
         document.getElementById('modalTitle').textContent = 
-            `Expenses: ${window.currentDate.toLocaleString('default', { month: 'short' })} ${day}`;
+            `Expenses: ${window.currentDate.toLocaleDateString('en-US', { month: 'short' })} ${day}`;
         document.getElementById('expenseAmount').value = '';
         document.getElementById('expenseDesc').value = '';
         window.renderModalList();
         document.getElementById('expenseModal').classList.add('active');
-        document.getElementById('expenseAmount').focus();
+        setTimeout(() => document.getElementById('expenseAmount').focus(), 100);
     };
 
     window.renderModalList = () => {
         const monthKey = window.getMonthKey(window.currentDate);
-        if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
-        const expenses = window.appData[monthKey].expenses[window.selectedDate] || [];
+        const expenses = (window.appData[monthKey]?.expenses?.[window.selectedDate]) || [];
         const container = document.getElementById('existingExpensesList');
         container.innerHTML = '';
         
-        if (expenses.length === 0) {
-            container.innerHTML = '<div style="color:#ccc; font-style:italic; text-align:center;">No expenses yet</div>';
-            return;
-        }
-
         expenses.forEach((ex, index) => {
             const row = document.createElement('div');
-            row.className = 'item-row';
+            row.style.padding = '10px';
+            row.style.borderBottom = '1px solid #eee';
+            row.style.display = 'flex';
+            row.style.justifyContent = 'space-between';
+            row.style.alignItems = 'center';
             row.innerHTML = `
-                <span>${ex.icon} <b>$${ex.amount}</b> ${ex.desc}</span>
-                <button class="btn-sm btn-danger" onclick="deleteExpense(${index})">Delete</button>
+                <span>${ex.icon} <b>$${ex.amount}</b> <span style="font-size:0.8rem; color:#666;">${ex.desc}</span></span>
+                <button class="btn-danger btn-sm" onclick="deleteExpense(${index})">×</button>
             `;
             container.appendChild(row);
         });
@@ -831,7 +842,8 @@
     window.saveExpense = () => {
         const amount = parseFloat(document.getElementById('expenseAmount').value);
         const desc = document.getElementById('expenseDesc').value || 'Expense';
-        if (isNaN(amount) || amount <= 0) return;
+        
+        if (isNaN(amount)) return;
 
         const monthKey = window.getMonthKey(window.currentDate);
         if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
