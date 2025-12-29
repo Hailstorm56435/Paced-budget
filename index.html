@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PaceBudget</title>
+    <title>PaceBudget (Family)</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -39,6 +39,20 @@
 
         h1 { margin: 0; font-size: 1.5rem; }
 
+        .auth-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #userDisplay {
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: none; /* Hidden until logged in */
+            align-items: center;
+            gap: 8px;
+        }
+
         .controls {
             display: flex;
             gap: 10px;
@@ -53,15 +67,33 @@
             border-radius: 6px;
             cursor: pointer;
             font-weight: 500;
+            transition: opacity 0.2s;
         }
 
         button:hover { opacity: 0.9; }
         
-        input[type="number"] {
+        button.btn-outline {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+        }
+
+        input {
             padding: 8px;
             border: 1px solid var(--border);
             border-radius: 6px;
-            width: 100px;
+        }
+
+        input[type="number"] { width: 100px; }
+
+        /* Loading State */
+        #loadingOverlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(255,255,255,0.8);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 2000;
+            font-size: 1.5rem;
+            color: var(--primary);
         }
 
         /* Calendar Grid */
@@ -77,7 +109,7 @@
         .calendar-grid {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
-            gap: 1px; /* Creates borders */
+            gap: 1px;
             background-color: var(--border);
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -92,10 +124,10 @@
             flex-direction: column;
             cursor: pointer;
             transition: background 0.2s;
+            position: relative;
         }
 
         .day-cell:hover { background-color: #f1f5f9; }
-        
         .day-cell.empty { background-color: #f8fafc; cursor: default; }
 
         .date-number {
@@ -122,7 +154,7 @@
             color: #64748b;
             margin-top: 5px;
             overflow-y: auto;
-            max-height: 50px;
+            max-height: 60px;
         }
 
         /* Expense Modal */
@@ -133,6 +165,7 @@
             background: rgba(0,0,0,0.5);
             align-items: center;
             justify-content: center;
+            z-index: 1000;
         }
 
         .modal.active { display: flex; }
@@ -141,8 +174,8 @@
             background: white;
             padding: 24px;
             border-radius: 12px;
-            width: 300px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            width: 320px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         }
 
         .modal h3 { margin-top: 0; }
@@ -152,97 +185,314 @@
         .form-group input { width: 100%; box-sizing: border-box; }
 
         .btn-secondary { background: #94a3b8; margin-right: 5px; }
+        .btn-danger { background: var(--danger); font-size: 0.7rem; padding: 4px 8px; }
+
+        .existing-items {
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f1f5f9;
+            padding: 6px;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            font-size: 0.85rem;
+        }
+
+        /* Login Form Styling */
+        #loginPrompt {
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 40px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            text-align: center;
+            display: none;
+        }
+        
+        .login-input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .auth-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .auth-actions button { flex: 1; }
+        
+        .error-msg {
+            color: var(--danger);
+            font-size: 0.9rem;
+            margin-top: 10px;
+            display: none;
+        }
+
+        #appContent { display: none; }
 
     </style>
 </head>
 <body>
 
+<div id="loadingOverlay">Loading...</div>
+
 <div class="container">
     <header>
-        <div class="controls">
-            <button onclick="changeMonth(-1)">←</button>
-            <h2 id="currentMonthLabel" style="margin:0; min-width: 150px; text-align: center;"></h2>
-            <button onclick="changeMonth(1)">→</button>
-        </div>
-        <div class="controls">
-            <label>Monthly Budget: $</label>
-            <input type="number" id="budgetInput" onchange="updateBudget()" placeholder="0">
+        <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
+             <h1 id="appTitle" style="display:none;">PaceBudget</h1>
+             <div id="userDisplay">
+                <span id="userEmail"></span>
+                <button class="btn-outline" onclick="logout()">Sign Out</button>
+            </div>
         </div>
     </header>
 
-    <div class="calendar-header">
-        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+    <div id="appContent">
+        <div class="controls" style="margin-bottom: 20px;">
+            <button onclick="changeMonth(-1)">←</button>
+            <h2 id="currentMonthLabel" style="margin:0; min-width: 150px; text-align: center;"></h2>
+            <button onclick="changeMonth(1)">→</button>
+            
+            <div style="margin-left: auto; display:flex; align-items:center; gap:5px;">
+                <label>Budget: $</label>
+                <input type="number" id="budgetInput" onchange="updateBudget()" placeholder="0">
+            </div>
+        </div>
+
+        <div class="calendar-header">
+            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
     </div>
-    <div class="calendar-grid" id="calendarGrid"></div>
+
+    <div id="loginPrompt">
+        <h2>Family Login</h2>
+        <p style="color:#64748b; margin-bottom:20px;">Log in to access your shared budget.</p>
+        
+        <input type="email" id="email" class="login-input" placeholder="Email Address">
+        <input type="password" id="password" class="login-input" placeholder="Password">
+        
+        <div class="auth-actions">
+            <button onclick="login()">Login</button>
+            <button class="btn-outline" onclick="signup()">Create Account</button>
+        </div>
+        <div id="authError" class="error-msg"></div>
+    </div>
 </div>
 
 <div class="modal" id="expenseModal">
     <div class="modal-content">
-        <h3 id="modalTitle">Add Expense</h3>
+        <h3 id="modalTitle">Manage Expenses</h3>
+        <div id="existingExpensesList" class="existing-items"></div>
         <div class="form-group">
             <label>Amount ($)</label>
-            <input type="number" id="expenseAmount" step="0.01">
+            <input type="number" id="expenseAmount" step="0.01" placeholder="0.00">
         </div>
         <div class="form-group">
             <label>Description (Optional)</label>
-            <input type="text" id="expenseDesc">
+            <input type="text" id="expenseDesc" placeholder="e.g., Coffee, Gas">
         </div>
         <div style="text-align: right;">
-            <button class="btn-secondary" onclick="closeModal()">Cancel</button>
-            <button onclick="saveExpense()">Save</button>
+            <button class="btn-secondary" onclick="closeModal()">Close</button>
+            <button onclick="saveExpense()">Add</button>
         </div>
     </div>
 </div>
 
-<script>
-    // --- State Management ---
-    let currentDate = new Date();
-    let selectedDate = null;
-    
-    // Data Structure: { "2023-10": { budget: 1000, expenses: { "5": [{amount: 10, desc: "Coffee"}] } } }
-    let appData = JSON.parse(localStorage.getItem('paceBudget_data')) || {};
+<script type="module">
+    // Import the functions you need from the SDKs you need
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    function getMonthKey(date) {
+    // Your web app's Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyCdPwx5Gh3_7sjm5KkbX_4yURUFcqoPsC0",
+      authDomain: "pacedbudget.firebaseapp.com",
+      projectId: "pacedbudget",
+      storageBucket: "pacedbudget.firebasestorage.app",
+      messagingSenderId: "1021494468094",
+      appId: "1:1021494468094:web:698572bafadb0d7c7cb4af",
+      measurementId: "G-FVX6B02E36"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Global App State
+    let currentUser = null;
+    let appData = {}; 
+    let unsubscribe = null; 
+
+    // --- Authentication Functions ---
+    window.login = () => {
+        const email = document.getElementById('email').value;
+        const pass = document.getElementById('password').value;
+        const errorDiv = document.getElementById('authError');
+        
+        signInWithEmailAndPassword(auth, email, pass)
+            .catch((error) => {
+                errorDiv.textContent = "Login Failed: " + error.message;
+                errorDiv.style.display = 'block';
+            });
+    };
+
+    window.signup = () => {
+        const email = document.getElementById('email').value;
+        const pass = document.getElementById('password').value;
+        const errorDiv = document.getElementById('authError');
+
+        createUserWithEmailAndPassword(auth, email, pass)
+            .catch((error) => {
+                errorDiv.textContent = "Signup Failed: " + error.message;
+                errorDiv.style.display = 'block';
+            });
+    }
+
+    window.logout = () => {
+        signOut(auth);
+    };
+
+    // --- Data Logic ---
+    onAuthStateChanged(auth, (user) => {
+        const overlay = document.getElementById('loadingOverlay');
+        currentUser = user;
+
+        if (user) {
+            // Logged In
+            document.getElementById('userDisplay').style.display = 'flex';
+            document.getElementById('userEmail').textContent = user.email;
+            document.getElementById('appContent').style.display = 'block';
+            document.getElementById('appTitle').style.display = 'block';
+            document.getElementById('loginPrompt').style.display = 'none';
+
+            startDataListener(user.uid);
+        } else {
+            // Logged Out
+            document.getElementById('userDisplay').style.display = 'none';
+            document.getElementById('appContent').style.display = 'none';
+            document.getElementById('appTitle').style.display = 'none';
+            document.getElementById('loginPrompt').style.display = 'block';
+            
+            // Clear inputs
+            document.getElementById('email').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('authError').style.display = 'none';
+            
+            appData = {};
+            if (unsubscribe) unsubscribe();
+        }
+        overlay.style.display = 'none';
+    });
+
+    function startDataListener(uid) {
+        unsubscribe = onSnapshot(doc(db, "users", uid), (docSnap) => {
+            if (docSnap.exists()) {
+                appData = docSnap.data();
+            } else {
+                appData = {};
+            }
+            window.renderCalendar();
+            
+            if(document.getElementById('expenseModal').classList.contains('active')) {
+                window.renderModalList();
+            }
+            
+            const monthKey = window.getMonthKey(window.currentDate);
+            if(appData[monthKey]) {
+                document.getElementById('budgetInput').value = appData[monthKey].budget;
+            }
+        });
+    }
+
+    window.saveToCloud = async () => {
+        if (!currentUser) return;
+        try {
+            await setDoc(doc(db, "users", currentUser.uid), appData);
+        } catch (e) {
+            console.error("Error saving document: ", e);
+        }
+    }
+
+    // --- Helper Functions ---
+    window.getSmartIcon = (description) => {
+        if (!description) return '💸';
+        const d = description.toLowerCase();
+        const map = {
+            'coffee': '☕', 'latte': '☕', 'starbucks': '☕',
+            'food': '🍔', 'dinner': '🍽️', 'lunch': '🥪', 'burger': '🍔',
+            'groceries': '🛒', 'market': '🛒', 'whole foods': '🥦',
+            'gas': '⛽', 'fuel': '⛽', 'car': '🚗', 'uber': '🚕',
+            'rent': '🏠', 'bill': '📄', 'utility': '⚡', 'gym': '💪', 'fitness': '🏃',
+            'movie': '🎬', 'netflix': '📺', 'game': '🎮', 'dog': '🐕', 'vet': '🐕'
+        };
+        for (let key in map) {
+            if (d.includes(key)) return map[key];
+        }
+        return '💸';
+    };
+
+    Object.defineProperty(window, 'appData', {
+        get: () => appData,
+        set: (val) => appData = val
+    });
+
+</script>
+
+<script>
+    // --- Legacy UI Logic (Adapted) ---
+
+    window.currentDate = new Date();
+    window.selectedDate = null;
+
+    window.getMonthKey = function(date) {
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     }
 
-    function saveData() {
-        localStorage.setItem('paceBudget_data', JSON.stringify(appData));
-        renderCalendar();
-    }
-
-    // --- Core Logic ---
-    function renderCalendar() {
+    window.renderCalendar = function() {
         const grid = document.getElementById('calendarGrid');
         grid.innerHTML = '';
         
-        const year = currentDate.getFullYear();
-        const month = currentDate.getMonth();
-        const monthKey = getMonthKey(currentDate);
+        const year = window.currentDate.getFullYear();
+        const month = window.currentDate.getMonth();
+        const monthKey = window.getMonthKey(window.currentDate);
 
-        // Update Header
         document.getElementById('currentMonthLabel').textContent = 
-            currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            window.currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         
-        // Ensure data object exists for this month
-        if (!appData[monthKey]) {
-            appData[monthKey] = { budget: 0, expenses: {} };
+        if (!window.appData[monthKey]) {
+            window.appData[monthKey] = { budget: 0, expenses: {} };
         }
-        document.getElementById('budgetInput').value = appData[monthKey].budget;
+        document.getElementById('budgetInput').value = window.appData[monthKey].budget;
 
-        // Calendar Math
         const firstDay = new Date(year, month, 1).getDay();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const dailyPace = appData[monthKey].budget / daysInMonth;
+        const dailyPace = window.appData[monthKey].budget / daysInMonth;
 
-        // Empty cells for previous month
         for (let i = 0; i < firstDay; i++) {
             const cell = document.createElement('div');
             cell.className = 'day-cell empty';
             grid.appendChild(cell);
         }
 
-        // Days
         let cumulativeSpend = 0;
 
         for (let day = 1; day <= daysInMonth; day++) {
@@ -250,20 +500,19 @@
             cell.className = 'day-cell';
             cell.onclick = () => openModal(day);
 
-            // Calculate Metrics
-            const dayExpenses = appData[monthKey].expenses[day] || [];
+            const dayExpenses = window.appData[monthKey].expenses[day] || [];
             const daySpendTotal = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
             cumulativeSpend += daySpendTotal;
 
-            // "Paced" Logic: By day X, you should have accrued X * dailyPace
             const accruedBudget = dailyPace * day;
             const availableBalance = accruedBudget - cumulativeSpend;
 
-            // HTML Content
-            let expenseHtml = dayExpenses.map(e => `<div>-$${e.amount} ${e.desc}</div>`).join('');
+            let expenseHtml = dayExpenses.map(e => 
+                `<div>${e.icon} -$${e.amount}</div>`
+            ).join('');
             
             const balanceClass = availableBalance >= 0 ? 'balance-positive' : 'balance-negative';
-            const balanceText = appData[monthKey].budget > 0 
+            const balanceText = window.appData[monthKey].budget > 0 
                 ? `$${availableBalance.toFixed(0)}` 
                 : '-';
 
@@ -281,55 +530,86 @@
         }
     }
 
-    // --- User Actions ---
-    function changeMonth(delta) {
-        currentDate.setMonth(currentDate.getMonth() + delta);
-        renderCalendar();
+    window.changeMonth = function(delta) {
+        window.currentDate.setMonth(window.currentDate.getMonth() + delta);
+        window.renderCalendar();
     }
 
-    function updateBudget() {
+    window.updateBudget = function() {
         const val = parseFloat(document.getElementById('budgetInput').value);
-        const monthKey = getMonthKey(currentDate);
-        if (!appData[monthKey]) appData[monthKey] = { expenses: {} };
-        appData[monthKey].budget = val;
-        saveData();
+        const monthKey = window.getMonthKey(window.currentDate);
+        if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
+        window.appData[monthKey].budget = val;
+        window.saveToCloud();
     }
 
-    function openModal(day) {
-        selectedDate = day;
-        document.getElementById('modalTitle').textContent = `Add Expense for ${currentDate.toLocaleString('default', { month: 'short' })} ${day}`;
+    window.openModal = function(day) {
+        window.selectedDate = day;
+        document.getElementById('modalTitle').textContent = `Expenses: ${window.currentDate.toLocaleString('default', { month: 'short' })} ${day}`;
         document.getElementById('expenseAmount').value = '';
         document.getElementById('expenseDesc').value = '';
+        window.renderModalList();
         document.getElementById('expenseModal').classList.add('active');
         document.getElementById('expenseAmount').focus();
     }
 
-    function closeModal() {
+    window.renderModalList = function() {
+        const monthKey = window.getMonthKey(window.currentDate);
+        if (!window.appData[monthKey]) window.appData[monthKey] = { budget: 0, expenses: {} };
+        const expenses = window.appData[monthKey].expenses[window.selectedDate] || [];
+        const container = document.getElementById('existingExpensesList');
+        container.innerHTML = '';
+        
+        if (expenses.length === 0) {
+            container.innerHTML = '<div style="color:#ccc; font-style:italic; text-align:center;">No expenses yet</div>';
+            return;
+        }
+
+        expenses.forEach((ex, index) => {
+            const row = document.createElement('div');
+            row.className = 'item-row';
+            row.innerHTML = `
+                <span>${ex.icon} <b>$${ex.amount}</b> ${ex.desc}</span>
+                <button class="btn-danger" onclick="deleteExpense(${index})">Delete</button>
+            `;
+            container.appendChild(row);
+        });
+    }
+
+    window.closeModal = function() {
         document.getElementById('expenseModal').classList.remove('active');
     }
 
-    function saveExpense() {
+    window.saveExpense = function() {
         const amount = parseFloat(document.getElementById('expenseAmount').value);
-        const desc = document.getElementById('expenseDesc').value;
+        const desc = document.getElementById('expenseDesc').value || 'Expense';
         
-        if (isNaN(amount)) return;
+        if (isNaN(amount) || amount <= 0) return;
 
-        const monthKey = getMonthKey(currentDate);
-        if (!appData[monthKey].expenses[selectedDate]) {
-            appData[monthKey].expenses[selectedDate] = [];
+        const monthKey = window.getMonthKey(window.currentDate);
+        if (!window.appData[monthKey]) window.appData[monthKey] = { budget: 0, expenses: {} };
+        if (!window.appData[monthKey].expenses[window.selectedDate]) {
+            window.appData[monthKey].expenses[window.selectedDate] = [];
         }
 
-        appData[monthKey].expenses[selectedDate].push({
+        window.appData[monthKey].expenses[window.selectedDate].push({
             amount: amount,
-            desc: desc
+            desc: desc,
+            icon: window.getSmartIcon(desc)
         });
 
-        saveData();
-        closeModal();
+        window.saveToCloud();
+        
+        document.getElementById('expenseAmount').value = '';
+        document.getElementById('expenseDesc').value = '';
+        document.getElementById('expenseAmount').focus();
     }
 
-    // Initialize
-    renderCalendar();
+    window.deleteExpense = function(index) {
+        const monthKey = window.getMonthKey(window.currentDate);
+        window.appData[monthKey].expenses[window.selectedDate].splice(index, 1);
+        window.saveToCloud();
+    }
 
 </script>
 </body>
