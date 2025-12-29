@@ -315,9 +315,7 @@
 </div>
 
 <script type="module">
-    // Import the functions you need from the SDKs you need
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -415,11 +413,6 @@
             if(document.getElementById('expenseModal').classList.contains('active')) {
                 window.renderModalList();
             }
-            
-            const monthKey = window.getMonthKey(window.currentDate);
-            if(appData[monthKey]) {
-                document.getElementById('budgetInput').value = appData[monthKey].budget;
-            }
         });
     }
 
@@ -467,6 +460,29 @@
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     }
 
+    // Returns a budget, inheriting from previous months if not set
+    window.getEffectiveBudget = function(date) {
+        const targetKey = window.getMonthKey(date);
+        
+        // 1. If explicit budget exists for this month, use it
+        if (window.appData[targetKey] && window.appData[targetKey].budget !== undefined) {
+            return window.appData[targetKey].budget;
+        }
+
+        // 2. Otherwise, look backwards for the last known budget
+        // We look back up to 12 months for simplicity
+        let checkDate = new Date(date);
+        for(let i=0; i<12; i++) {
+            checkDate.setMonth(checkDate.getMonth() - 1);
+            const key = window.getMonthKey(checkDate);
+            if (window.appData[key] && window.appData[key].budget !== undefined) {
+                return window.appData[key].budget;
+            }
+        }
+
+        return 0; // Default if nothing found
+    }
+
     window.renderCalendar = function() {
         const grid = document.getElementById('calendarGrid');
         grid.innerHTML = '';
@@ -478,14 +494,19 @@
         document.getElementById('currentMonthLabel').textContent = 
             window.currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         
+        // Get the "inherited" budget or the real one
+        const currentBudget = window.getEffectiveBudget(window.currentDate);
+        document.getElementById('budgetInput').value = currentBudget;
+
+        // Ensure current month object exists in memory for rendering (even if empty)
         if (!window.appData[monthKey]) {
-            window.appData[monthKey] = { budget: 0, expenses: {} };
+            // Note: We do NOT set the budget here. We keep it undefined so it inherits dynamically.
+            window.appData[monthKey] = { expenses: {} };
         }
-        document.getElementById('budgetInput').value = window.appData[monthKey].budget;
 
         const firstDay = new Date(year, month, 1).getDay();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const dailyPace = window.appData[monthKey].budget / daysInMonth;
+        const dailyPace = currentBudget / daysInMonth;
 
         for (let i = 0; i < firstDay; i++) {
             const cell = document.createElement('div');
@@ -512,7 +533,7 @@
             ).join('');
             
             const balanceClass = availableBalance >= 0 ? 'balance-positive' : 'balance-negative';
-            const balanceText = window.appData[monthKey].budget > 0 
+            const balanceText = currentBudget > 0 
                 ? `$${availableBalance.toFixed(0)}` 
                 : '-';
 
@@ -538,7 +559,10 @@
     window.updateBudget = function() {
         const val = parseFloat(document.getElementById('budgetInput').value);
         const monthKey = window.getMonthKey(window.currentDate);
+        
         if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
+        
+        // Explicitly setting the budget "breaks" the inheritance chain for this month
         window.appData[monthKey].budget = val;
         window.saveToCloud();
     }
@@ -555,7 +579,7 @@
 
     window.renderModalList = function() {
         const monthKey = window.getMonthKey(window.currentDate);
-        if (!window.appData[monthKey]) window.appData[monthKey] = { budget: 0, expenses: {} };
+        if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
         const expenses = window.appData[monthKey].expenses[window.selectedDate] || [];
         const container = document.getElementById('existingExpensesList');
         container.innerHTML = '';
@@ -587,7 +611,11 @@
         if (isNaN(amount) || amount <= 0) return;
 
         const monthKey = window.getMonthKey(window.currentDate);
-        if (!window.appData[monthKey]) window.appData[monthKey] = { budget: 0, expenses: {} };
+        if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
+        
+        // Note: Adding an expense does NOT break budget inheritance. 
+        // The budget stays inherited until the USER changes the number in the input box.
+        
         if (!window.appData[monthKey].expenses[window.selectedDate]) {
             window.appData[monthKey].expenses[window.selectedDate] = [];
         }
