@@ -59,9 +59,15 @@
         button.btn-text { background: transparent; color: var(--text-sub); padding: 5px; }
         button.btn-success { background: var(--success); }
         button.btn-danger { background: var(--danger); }
+        button.btn-danger-outline { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
         button.btn-warning { background: var(--warning); color: #fff; }
         button.btn-sm { padding: 6px 12px; font-size: 0.8rem; }
-        button.icon-btn { padding: 4px 8px; font-size: 1rem; background: #eee; color: #333; }
+        
+        /* Plain text buttons for actions */
+        button.action-btn { 
+            background: #f1f5f9; color: var(--text-main); font-weight: 500; 
+            font-size: 0.8rem; padding: 5px 10px; border: 1px solid var(--border);
+        }
 
         input {
             padding: 10px; border: 1px solid var(--border); border-radius: 8px;
@@ -87,20 +93,32 @@
         #pendingAmount { width: 90px; flex-shrink: 0; }
         #pendingDesc { flex-grow: 1; }
         
-        /* Link input row */
         .link-row { display: flex; align-items: center; gap: 8px; }
         .link-input { font-size: 0.85rem; padding: 8px; color: var(--primary); }
 
-        .pending-list { padding: 0; max-height: 300px; overflow-y: auto; }
+        .pending-list { padding: 0; max-height: 400px; overflow-y: auto; }
 
         .pending-item {
-            padding: 12px 15px; border-bottom: 1px solid var(--border);
-            display: flex; flex-direction: column; gap: 8px;
+            padding: 15px; border-bottom: 1px solid var(--border);
+            display: flex; flex-direction: column; gap: 10px;
         }
         .pending-item.editing { background-color: #fffbeb; border-left: 3px solid var(--warning); }
 
-        .pending-top { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
-        .pending-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+        .pending-top { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 1rem; }
+        
+        .pending-actions { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding-top: 5px; gap: 10px; flex-wrap: wrap;
+        }
+        .pending-edit-controls { display: flex; gap: 5px; }
+
+        .schedule-row {
+            display: flex; align-items: center; gap: 5px; background: #f8fafc; 
+            padding: 5px; border-radius: 6px; border: 1px solid #e2e8f0;
+        }
+        .manual-date-input {
+            padding: 4px; font-size: 0.8rem; width: 110px; border: 1px solid #ccc;
+        }
 
         /* --- CALENDAR GRID --- */
         .calendar-header {
@@ -161,6 +179,9 @@
             .expense-chip { background: #f1f5f9; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; }
             
             .balance-indicator { margin-top: 0; font-size: 0.95rem; min-width: 70px; }
+            
+            .pending-actions { flex-direction: column; align-items: stretch; }
+            .schedule-row { justify-content: center; margin-top: 5px; }
         }
 
         /* --- MODAL --- */
@@ -237,7 +258,7 @@
             </div>
 
             <button class="btn-outline" onclick="toggleInbox()" id="inboxBtn">
-                <span>📥 Unscheduled Inbox</span>
+                <span>📂 Unscheduled Expenses</span>
                 <span id="inboxCount" style="background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">0</span>
             </button>
         </div>
@@ -250,7 +271,7 @@
                 </div>
                 <div class="link-row">
                     <input type="url" id="pendingLink" class="link-input" placeholder="Paste Item Link (optional)">
-                    <button type="button" id="addPendingBtn" onclick="addPendingItem()">Add</button>
+                    <button type="button" id="addPendingBtn" onclick="addPendingItem()">Add to List</button>
                     <button type="button" id="cancelPendingEditBtn" class="btn-text" onclick="cancelPendingEdit()" style="display:none;">Cancel</button>
                 </div>
             </div>
@@ -365,21 +386,18 @@
     function startDataListener(uid) {
         unsubscribe = onSnapshot(doc(db, "users", uid), (docSnap) => {
             if (docSnap.exists()) {
-                // FIXED: Explicitly update the global window object
                 window.appData = docSnap.data();
                 if (!window.appData.pending) window.appData.pending = [];
             } else {
                 window.appData = { pending: [] };
             }
             window.refreshUI();
-            window.checkForTodayAlerts();
         });
     }
 
     window.saveToCloud = async () => {
         if (!currentUser) return;
         try { 
-            // FIXED: Use window.appData to ensure we save what is on screen
             await setDoc(doc(db, "users", currentUser.uid), window.appData); 
         } 
         catch (e) { console.error(e); }
@@ -421,32 +439,12 @@
     window.showHistory = false;
     window.editingPendingIndex = -1; // -1 means new, >=0 means editing
     window.editingExpenseIndex = -1; // For modal editing
-    window.hasCheckedAlerts = false; // Prevent spamming alerts
 
     window.getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
 
     window.toggleHistory = () => {
         window.showHistory = !window.showHistory;
         window.renderCalendar();
-    };
-
-    // --- "TODAY" ALERT LOGIC ---
-    window.checkForTodayAlerts = () => {
-        const today = new Date();
-        const monthKey = window.getMonthKey(today);
-        const day = today.getDate();
-        
-        if(window.hasCheckedAlerts) return;
-
-        if(window.appData[monthKey] && window.appData[monthKey].expenses && window.appData[monthKey].expenses[day]) {
-            const items = window.appData[monthKey].expenses[day];
-            if(items.length > 0) {
-                 setTimeout(() => {
-                     alert(`📅 You have ${items.length} items scheduled for TODAY! \nTime to buy!`);
-                 }, 1000);
-            }
-        }
-        window.hasCheckedAlerts = true;
     };
 
     // --- INBOX LOGIC ---
@@ -479,7 +477,7 @@
             // Update existing
             window.appData.pending[window.editingPendingIndex] = newItem;
             window.editingPendingIndex = -1;
-            document.getElementById('addPendingBtn').textContent = "Add";
+            document.getElementById('addPendingBtn').textContent = "Add to List";
             document.getElementById('cancelPendingEditBtn').style.display = 'none';
         } else {
             // Add new
@@ -508,7 +506,7 @@
         document.getElementById('pendingAmount').value = '';
         document.getElementById('pendingDesc').value = '';
         document.getElementById('pendingLink').value = '';
-        document.getElementById('addPendingBtn').textContent = "Add";
+        document.getElementById('addPendingBtn').textContent = "Add to List";
         document.getElementById('cancelPendingEditBtn').style.display = 'none';
         window.renderPendingList();
     };
@@ -520,7 +518,7 @@
         
         list.innerHTML = '';
         if(count === 0) {
-            list.innerHTML = '<div style="padding:15px; text-align:center; color:var(--text-sub); font-size:0.9rem;">Inbox is empty.<br>Add unscheduled items above.</div>';
+            list.innerHTML = '<div style="padding:15px; text-align:center; color:var(--text-sub); font-size:0.9rem;">Queue is empty.<br>Add unscheduled expenses above.</div>';
             return;
         }
 
@@ -529,9 +527,10 @@
             div.className = 'pending-item';
             if(idx === window.editingPendingIndex) div.classList.add('editing');
             
+            // Smart Schedule Calc
             const suggestedDate = window.findNextAffordableDate(item.amount);
-            let btnHtml = suggestedDate 
-                ? `<button class="btn-success btn-sm" onclick="commitPending(${idx}, '${suggestedDate.toISOString()}')">Schedule ${suggestedDate.toLocaleDateString('en-US', {month:'short', day:'numeric'})}</button>`
+            let smartBtnHtml = suggestedDate 
+                ? `<button class="btn-success btn-sm" onclick="commitPending(${idx}, '${suggestedDate.toISOString()}')">Smart Schedule ${suggestedDate.toLocaleDateString('en-US', {month:'short', day:'numeric'})}</button>`
                 : `<button class="btn-outline btn-sm" disabled style="opacity:0.5;">Budget Tight</button>`;
             
             let linkHtml = item.link ? `<a href="${item.link}" target="_blank" class="link-icon">🔗 Link</a>` : '';
@@ -541,10 +540,19 @@
                     <span>${item.icon} ${item.desc} ${linkHtml}</span>
                     <span>$${item.amount}</span>
                 </div>
+                
                 <div class="pending-actions">
-                    <button class="icon-btn" onclick="editPending(${idx})">✏️</button>
-                    <button class="icon-btn" onclick="deletePending(${idx})">🗑️</button>
-                    ${btnHtml}
+                    <div class="pending-edit-controls">
+                        <button class="action-btn" onclick="editPending(${idx})">Edit</button>
+                        <button class="action-btn" style="color:var(--danger); border-color:var(--danger);" onclick="deletePending(${idx})">Delete</button>
+                    </div>
+
+                    ${smartBtnHtml}
+
+                    <div class="schedule-row">
+                        <input type="date" id="manualDate-${idx}" class="manual-date-input">
+                        <button class="action-btn" onclick="manualSchedule(${idx})">Move</button>
+                    </div>
                 </div>
             `;
             list.appendChild(div);
@@ -552,15 +560,34 @@
     };
 
     window.deletePending = (idx) => {
-        if(confirm("Delete this item?")) {
+        if(confirm("Delete this unscheduled expense?")) {
             if(idx === window.editingPendingIndex) window.cancelPendingEdit();
             window.appData.pending.splice(idx, 1);
             window.saveToCloud();
         }
     };
 
+    // Triggered by the Smart Schedule button
     window.commitPending = (idx, dateString) => {
         const targetDate = new Date(dateString);
+        window.finalizeSchedule(idx, targetDate);
+    };
+
+    // Triggered by the Manual "Move" button
+    window.manualSchedule = (idx) => {
+        const dateVal = document.getElementById(`manualDate-${idx}`).value;
+        if(!dateVal) {
+            alert("Please pick a date first.");
+            return;
+        }
+        // Create date from input string (YYYY-MM-DD) to ensure correct local date
+        const parts = dateVal.split('-');
+        const targetDate = new Date(parts[0], parts[1]-1, parts[2]);
+        window.finalizeSchedule(idx, targetDate);
+    }
+
+    // Common logic to move item from Pending -> Calendar
+    window.finalizeSchedule = (idx, targetDate) => {
         const item = window.appData.pending[idx];
         const monthKey = window.getMonthKey(targetDate);
         const day = targetDate.getDate();
@@ -579,10 +606,15 @@
         window.appData.pending.splice(idx, 1);
         window.saveToCloud();
         
+        // If date is in current view, refresh calendar
         if (targetDate.getMonth() === window.currentDate.getMonth()) {
             window.renderCalendar();
+        } else {
+            // If moved to a different month, switch view to that month so user sees it
+            window.currentDate = targetDate;
+            window.renderCalendar();
         }
-    };
+    }
 
     window.findNextAffordableDate = function(amount) {
         let checkDate = new Date();
@@ -772,7 +804,7 @@
 
             row.innerHTML = `
                 <span>${ex.icon} <b>$${ex.amount}</b> ${ex.desc} ${linkIcon}</span>
-                <button class="btn-danger btn-sm" onclick="event.stopPropagation(); deleteExpense(${index})">×</button>
+                <button class="btn-danger-outline btn-sm" onclick="event.stopPropagation(); deleteExpense(${index})">Delete</button>
             `;
             container.appendChild(row);
         });
