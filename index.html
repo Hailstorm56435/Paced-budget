@@ -265,7 +265,10 @@
 
 <div class="container">
     <header>
-        <h1 style="margin:0; font-size:1.2rem; font-weight:800; color:var(--primary);">PaceBudget</h1>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <h1 style="margin:0; font-size:1.2rem; font-weight:800; color:var(--primary);">PaceBudget</h1>
+            <button class="btn-text" onclick="openHelp()" style="font-size:1.1rem; width:30px; height:30px; border-radius:50%; border:1px solid #ccc; display:flex; align-items:center; justify-content:center;">?</button>
+        </div>
         <div id="userDisplay" style="display:none;">
             <div class="profile-btn" onclick="openSettings()">👤</div>
         </div>
@@ -282,6 +285,9 @@
                 <button type="button" class="btn-outline" onclick="signup()">Create Account</button>
             </div>
         </form>
+        <div style="margin-top:20px; border-top:1px solid #eee; padding-top:10px;">
+            <button class="btn-text" onclick="openHelp()" style="font-size:0.9rem;">What is PaceBudget?</button>
+        </div>
         <div id="authError" style="color:var(--danger); margin-top:10px; font-size:0.9rem; display:none;"></div>
     </div>
 
@@ -421,6 +427,47 @@
         <div style="display:flex; flex-direction:column; gap:10px;">
             <button class="btn-success" onclick="applySmartSchedule()">✨ Auto-Schedule to Budget</button>
             <button class="btn-text" onclick="closeQueueModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+<div class="modal" id="helpModal">
+    <div class="modal-content" style="max-width:550px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 style="margin:0; color:var(--primary);">Welcome to PaceBudget</h2>
+            <button class="btn-text" onclick="closeHelp()" style="font-size:1.5rem; line-height:1;">&times;</button>
+        </div>
+        
+        <div style="line-height:1.6; color:var(--text-main); font-size:0.95rem;">
+            <p><strong>Most budgeting apps fail because they ignore time.</strong> They tell you that you have $500 for groceries, but they don't warn you that spending $200 today will cause you to bounce a check next week.</p>
+            
+            <h4 style="margin:15px 0 5px 0;">🚀 The "Pace" Philosophy</h4>
+            <p style="margin-top:0;">
+                PaceBudget treats your monthly income as a <strong>daily wage</strong>. If your budget is $3,000/month, you "earn" $100 every day.
+            </p>
+
+            <h4 style="margin:15px 0 5px 0;">🔮 The Crystal Ball (Look-Ahead)</h4>
+            <p style="margin-top:0;">
+                The balance you see on the calendar is your <strong>"True Safe Cash."</strong> 
+                <br><br>
+                <em>Example:</em> You have $100 today. But you have a $90 bill due in 3 days. 
+                Standard apps say you have $100. PaceBudget says you have <strong>$10</strong>. 
+                It automatically reserves money for future bills so you never accidentally overspend.
+            </p>
+
+            <h4 style="margin:15px 0 5px 0;">🛠 How to use it</h4>
+            <ul style="padding-left:20px; margin-top:5px;">
+                <li><strong>Step 1:</strong> Set your total Monthly Budget at the top.</li>
+                <li><strong>Step 2:</strong> Add your fixed bills (Rent, Internet) on their due dates.</li>
+                <li><strong>Step 3:</strong> Check the <strong>Green Number</strong> on "Today." That is exactly how much you can spend on coffee, lunch, or fun without breaking your future plans.</li>
+            </ul>
+
+            <div style="background:#eff6ff; padding:15px; border-radius:8px; margin-top:15px; border-left:4px solid var(--primary);">
+                <strong>Pro Tip:</strong> Use the <em>Plan Queue</em>! Dump all your upcoming expenses into the list, and hit <strong>Auto-Schedule</strong>. The AI will find the perfect days to pay them without ever letting your balance go red.
+            </div>
+        </div>
+        
+        <div style="margin-top:20px; text-align:center;">
+            <button class="btn-outline" onclick="closeHelp()">Got it!</button>
         </div>
     </div>
 </div>
@@ -616,6 +663,7 @@
     }
 
     // --- SETTINGS ---
+    
     window.openSettings = () => {
         document.getElementById('settingsModal').classList.add('active');
         window.renderSettings();
@@ -655,6 +703,9 @@
         window.saveToCloud();
         window.renderSettings();
     };
+    // --- HELP MODAL ---
+    window.openHelp = () => document.getElementById('helpModal').classList.add('active');
+    window.closeHelp = () => document.getElementById('helpModal').classList.remove('active');
 
     // --- QUEUE / RESCHEDULER LOGIC ---
     window.openQueueModal = () => {
