@@ -1035,7 +1035,7 @@
         return null;
     };
 
-    // --- CALENDAR RENDER ---
+   // --- CALENDAR RENDER (With "Look-Ahead" True Availability) ---
     window.renderCalendar = () => {
         const grid = document.getElementById('calendarGrid');
         grid.innerHTML = '';
@@ -1046,6 +1046,7 @@
         document.getElementById('currentMonthLabel').textContent = window.currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
         const currentBudget = window.getBudgetForDate(window.currentDate);
+        // Only update input if not focused
         if(document.activeElement !== document.getElementById('budgetInput')) {
             document.getElementById('budgetInput').value = currentBudget || '';
         }
@@ -1057,16 +1058,43 @@
         const today = new Date();
         const isCurrentMonth = (today.getFullYear() === y && today.getMonth() === m);
 
+        // --- STEP 1: PRE-CALCULATE BALANCES ---
+        const monthKey = window.getMonthKey(window.currentDate);
+        const expensesMap = (window.appData[monthKey] && window.appData[monthKey].expenses) ? window.appData[monthKey].expenses : {};
+        
+        const rawBalances = [];  // Technical balance on that specific day
+        const safeBalances = []; // The "True Available" (lowest future dip)
+        
+        let tempRunningSpent = 0;
+
+        // 1. Calculate Raw Balances (Standard)
+        for(let d=1; d<=daysInMonth; d++) {
+            const dayExpenses = expensesMap[d] || [];
+            const dayCost = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
+            tempRunningSpent += dayCost;
+            
+            const accrued = dailyRate * d;
+            rawBalances[d] = accrued - tempRunningSpent;
+        }
+
+        // 2. Calculate Safe Balances (Look-Ahead / Backwards Ripple)
+        // We start from the end of the month. The "Safe" amount for Day X 
+        // is the Minimum of (RawBalance Day X, SafeBalance Day X+1)
+        let minFuture = Infinity;
+        for(let d=daysInMonth; d>=1; d--) {
+            // If the raw balance on this day is lower than what we've seen in the future,
+            // this becomes the new "low water mark".
+            if(rawBalances[d] < minFuture) minFuture = rawBalances[d];
+            safeBalances[d] = minFuture;
+        }
+
+        // --- STEP 2: RENDER GRID ---
+
         for(let i=0; i<firstDayOfMonth; i++) {
             const d = document.createElement('div');
             d.className = 'day-cell empty';
             grid.appendChild(d);
         }
-
-        const monthKey = window.getMonthKey(window.currentDate);
-        const expensesMap = (window.appData[monthKey] && window.appData[monthKey].expenses) ? window.appData[monthKey].expenses : {};
-
-        let runningSpent = 0;
 
         for(let day=1; day<=daysInMonth; day++) {
             const dateObj = new Date(y, m, day);
@@ -1077,22 +1105,19 @@
             
             if(isCurrentMonth && day === today.getDate()) cell.classList.add('today');
             
-            // Logic for hiding past days on mobile
             if(isPast) {
-                cell.classList.add('hidden-mobile'); // CSS handles display:none for mobile, opacity for desktop
+                cell.classList.add('hidden-mobile');
                 if(window.showHistory) {
-                   cell.classList.remove('hidden-mobile'); // Show it
-                   cell.style.opacity = '0.5'; // But keep it visual grey
+                   cell.classList.remove('hidden-mobile');
+                   cell.style.opacity = '0.5';
                    cell.style.background = '#f1f5f9';
                 }
             }
 
             const dayExpenses = expensesMap[day] || [];
-            const dayCost = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
-            runningSpent += dayCost;
-
-            const accrued = dailyRate * day;
-            const balance = accrued - runningSpent;
+            
+            // DISPLAY: Use the Safe Balance (True Available)
+            const balance = safeBalances[day];
 
             const dayName = dateObj.toLocaleDateString('en-US', {weekday:'short'});
 
@@ -1103,7 +1128,8 @@
                 </div>`;
             });
 
-            const balClass = balance >= 0 ? 'bal-pos' : 'bal-neg';
+            // -0.01 tolerance for floating point math
+            const balClass = balance >= -0.01 ? 'bal-pos' : 'bal-neg';
 
             cell.innerHTML = `
                 <div class="date-number">
