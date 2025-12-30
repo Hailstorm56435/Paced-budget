@@ -148,7 +148,6 @@
         }
         .day-cell:hover { background-color: #f8fafc; }
         .day-cell.today { background-color: #eff6ff; }
-        .day-cell.hidden-mobile { display: flex; } /* Default visible on desktop */
         
         .date-number { font-weight: 700; display: flex; justify-content: space-between; margin-bottom: 5px; }
         .day-weekday { display: none; }
@@ -171,8 +170,8 @@
             .calendar-header { display: none; }
             .calendar-grid { display: flex; flex-direction: column; gap: 0; background: transparent; border: none; }
             
-            /* Mobile: Hide past days unless toggled */
-            .day-cell.hidden-mobile { display: none; }
+            /* Mobile: Hide past days completely if toggled off */
+            .day-cell.hidden-mobile { display: none !important; }
 
             .day-cell {
                 min-height: 60px; border-bottom: 1px solid var(--border);
@@ -198,13 +197,13 @@
             .pending-actions { flex-direction: column; align-items: stretch; }
             .schedule-row { justify-content: center; margin-top: 5px; }
 
-            /* Show toggle only on mobile */
             #historyToggleContainer { display: block; }
         }
 
         /* Desktop: Ensure toggle is hidden and cells are just greyed out, not removed */
         @media (min-width: 601px) {
             #historyToggleContainer { display: none !important; }
+            /* Force flex display even if class is present, just lower opacity */
             .day-cell.hidden-mobile { display: flex !important; opacity: 0.4; background: #f8fafc; }
         }
 
@@ -496,7 +495,7 @@
                 if (!window.appData.pending) window.appData.pending = [];
                 if (!window.appData.emailList) window.appData.emailList = [];
                 if (!window.appData.budgets) {
-                    // Migration: if old single budget exists, move to current month
+                    // Migration
                     if(window.appData.budget) {
                         const mKey = window.getMonthKey(new Date());
                         window.appData.budgets = {};
@@ -566,6 +565,8 @@
     window.toggleHistory = () => {
         window.showHistory = !window.showHistory;
         window.renderCalendar();
+        // Update button text
+        document.getElementById('historyBtn').textContent = window.showHistory ? "Hide previous days" : "Show previous days";
     };
 
     window.changeMonth = (dir) => {
@@ -574,8 +575,6 @@
     };
 
     // --- INDEPENDENT BUDGET LOGIC ---
-    
-    // Gets budget for specific month, or falls back to most recent previous month setting
     window.getBudgetForDate = (dateObj) => {
         if(!window.appData.budgets) return 0;
         
@@ -584,7 +583,6 @@
         if(window.appData.budgets[key] !== undefined) return window.appData.budgets[key];
 
         // 2. Find most recent past budget
-        // We look at all keys, filter for those BEFORE this date, sort descending
         const sortedKeys = Object.keys(window.appData.budgets).sort().reverse();
         for(let k of sortedKeys) {
             if(k < key) return window.appData.budgets[k];
@@ -607,10 +605,9 @@
     // --- VALIDATOR FOR EXPENSE SIZE ---
     window.checkExpenseLimit = (amount, dateContext) => {
         const budget = window.getBudgetForDate(dateContext);
-        if(budget <= 0) return true; // No budget set, technically no limit, or allow basic usage
+        if(budget <= 0) return true;
         
-        const limit = budget / 2; // UPDATED to 1/2
-        
+        const limit = budget / 2; // 50% Cap
         if (amount > limit) {
             alert(`⚠️ Expense Limit Reached\n\nTo ensure budget stability, individual expenses cannot exceed 50% of the monthly budget.\n\nLimit: $${limit.toFixed(2)}\nAttempted: $${amount.toFixed(2)}`);
             return false;
@@ -659,8 +656,7 @@
         window.renderSettings();
     };
 
-    // --- SMART QUEUE / RESCHEDULER LOGIC ---
-    
+    // --- QUEUE / RESCHEDULER LOGIC ---
     window.openQueueModal = () => {
         window.tempQueue = [];
         const today = new Date();
@@ -685,19 +681,15 @@
 
         // Sort by date initially
         window.tempQueue.sort((a,b) => a.originalDate - b.originalDate);
-
         window.renderQueueList();
         document.getElementById('queueModal').classList.add('active');
     };
 
-    window.closeQueueModal = () => {
-        document.getElementById('queueModal').classList.remove('active');
-    };
+    window.closeQueueModal = () => document.getElementById('queueModal').classList.remove('active');
 
     window.renderQueueList = () => {
         const c = document.getElementById('queueContainer');
         c.innerHTML = '';
-        
         if (window.tempQueue.length === 0) {
             c.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No upcoming scheduled expenses found.</div>';
             return;
@@ -732,11 +724,65 @@
         window.renderQueueList();
     };
 
-    // --- ACCRUAL BASED AUTO-SCHEDULE ---
+
+    // --- ADVANCED SOLVENCY CHECK ---
+    // This function checks if adding 'amount' on 'checkDate' keeps the budget positive 
+    // for checkDate AND ALL SUBSEQUENT DAYS in the month.
+    window.isSafeToSpend = (amount, checkDate, tempAddedExpenses = []) => {
+        const monthlyBudget = window.getBudgetForDate(checkDate);
+        if (monthlyBudget <= 0) return true; // No budget = no rules
+
+        const y = checkDate.getFullYear();
+        const m = checkDate.getMonth();
+        const daysInMonth = new Date(y, m+1, 0).getDate();
+        const dailyRate = monthlyBudget / daysInMonth;
+        const mKey = window.getMonthKey(checkDate);
+
+        // Calculate baseline expenses per day from existing appData
+        const dailyExpenses = new Array(daysInMonth + 1).fill(0);
+
+        if(window.appData[mKey] && window.appData[mKey].expenses) {
+            Object.keys(window.appData[mKey].expenses).forEach(dStr => {
+                const day = parseInt(dStr);
+                window.appData[mKey].expenses[dStr].forEach(e => {
+                    dailyExpenses[day] += e.amount;
+                });
+            });
+        }
+
+        // Add any temporary expenses (for the Queue loop simulation)
+        tempAddedExpenses.forEach(t => {
+            if(t.monthKey === mKey) {
+                dailyExpenses[t.day] += t.amount;
+            }
+        });
+
+        // Add the candidate amount to the specific check day
+        dailyExpenses[checkDate.getDate()] += amount;
+
+        // Verify Balance from Day 1 to End of Month
+        // We only need to check starting from the day we are adding money, 
+        // but checking whole month is safer to ensure integrity.
+        let runningSpent = 0;
+        for(let d = 1; d <= daysInMonth; d++) {
+            runningSpent += dailyExpenses[d];
+            const accrued = dailyRate * d;
+            const balance = accrued - runningSpent;
+            
+            // If balance drops below zero on ANY day (including or after our target date), it's unsafe.
+            // (We allow small floating point error -0.01)
+            if (balance < -0.01) return false;
+        }
+
+        return true;
+    };
+
+
+    // --- QUEUE EXECUTION ---
     window.applySmartSchedule = () => {
         if(!confirm("Reschedule all upcoming expenses to fit your budget?")) return;
 
-        // 1. CLEAR existing future expenses
+        // 1. CLEAR existing future expenses from AppData
         const today = new Date();
         today.setHours(0,0,0,0);
         
@@ -754,63 +800,35 @@
             });
         });
 
-        // 2. Schedule Items
-        let dateCursor = new Date(today); // Start searching from today
+        // 2. Schedule Items One by One
+        // We keep a list of items we have placed *in this transaction* so isSafeToSpend can see them
+        const newlyPlacedItems = []; 
+        let dateCursor = new Date(today); 
 
         window.tempQueue.forEach(item => {
             let placed = false;
             let safety = 0;
 
-            while (!placed && safety < 730) {
-                // Get budget for this specific month we are checking
-                const monthlyBudget = window.getBudgetForDate(dateCursor);
-                if (monthlyBudget <= 0) {
-                    // Skip months with no budget
-                    dateCursor.setDate(dateCursor.getDate() + 1);
-                    safety++;
-                    continue;
-                }
+            // Reset cursor to today for high priority items? 
+            // Or keep cursor moving? 
+            // "Plan Queue" implies order matters. We should try to place Item 1 as early as possible, 
+            // then Item 2 as early as possible.
+            dateCursor = new Date(today);
 
-                const y = dateCursor.getFullYear();
-                const m = dateCursor.getMonth();
-                const dStart = dateCursor.getDate();
-                const daysInMonth = new Date(y, m+1, 0).getDate();
-                const dailyRate = monthlyBudget / daysInMonth;
+            while (!placed && safety < 365) {
                 const mKey = window.getMonthKey(dateCursor);
-                
-                // Ensure data structure
-                if(!window.appData[mKey]) window.appData[mKey] = { expenses: {} };
-                if(!window.appData[mKey].expenses) window.appData[mKey].expenses = {};
+                const day = dateCursor.getDate();
 
-                let possible = true;
+                // Check if placing here is safe for the WHOLE future of the month
+                // pass newlyPlacedItems to the check so it knows about previous loop iterations
+                const safe = window.isSafeToSpend(item.amount, dateCursor, newlyPlacedItems);
 
-                // Simulate placing it
-                // We need to check if ANY day from dStart to daysInMonth becomes negative
-                for(let d = dStart; d <= daysInMonth; d++) {
-                    const accrued = dailyRate * d;
+                if (safe) {
+                    // It fits!
+                    if(!window.appData[mKey]) window.appData[mKey] = { expenses: {} };
+                    if(!window.appData[mKey].expenses) window.appData[mKey].expenses = {};
+                    if(!window.appData[mKey].expenses[day]) window.appData[mKey].expenses[day] = [];
                     
-                    // Sum existing expenses for this day
-                    let spent = 0;
-                    // Count items already in DB
-                    for(let k=1; k<=d; k++) {
-                        if(window.appData[mKey].expenses[k]) {
-                            window.appData[mKey].expenses[k].forEach(e => spent += e.amount);
-                        }
-                    }
-                    // Add the candidate item if d >= dStart (because expenses accumulate)
-                    if (d >= dStart) {
-                         spent += item.amount;
-                    }
-
-                    if ( (accrued - spent) < 0 ) {
-                        possible = false;
-                        break; 
-                    }
-                }
-
-                if (possible) {
-                    // Place it!
-                    if(!window.appData[mKey].expenses[dStart]) window.appData[mKey].expenses[dStart] = [];
                     const cleanItem = {
                         amount: item.amount,
                         desc: item.desc,
@@ -818,7 +836,12 @@
                         icon: item.icon || '💸',
                         addedAt: new Date().toISOString()
                     };
-                    window.appData[mKey].expenses[dStart].push(cleanItem);
+
+                    window.appData[mKey].expenses[day].push(cleanItem);
+                    
+                    // Add to temp array so next iteration sees it
+                    newlyPlacedItems.push({ monthKey: mKey, day: day, amount: item.amount });
+                    
                     placed = true;
                 } else {
                     // Try next day
@@ -832,7 +855,6 @@
         window.closeQueueModal();
         window.renderCalendar();
     };
-
 
     // --- UNSCHEDULED EXPENSES LOGIC ---
     window.toggleInbox = () => {
@@ -888,7 +910,7 @@
         document.getElementById('pendingAmount').value = item.amount;
         document.getElementById('pendingDesc').value = item.desc;
         document.getElementById('pendingLink').value = item.link || '';
-        document.getElementById('pendingTax').checked = false; // assumed tax already included in stored amount
+        document.getElementById('pendingTax').checked = false; 
         
         window.editingPendingIndex = idx;
         document.getElementById('addPendingBtn').textContent = "Update";
@@ -994,35 +1016,16 @@
         window.renderPendingList();
     };
 
+    // --- Updated Smart Scheduler Logic (Lookahead) ---
     window.findNextAffordableDate = (amount) => {
         const today = new Date();
-        // Look ahead 2 years
-        for(let i=0; i<730; i++) {
+        // Look ahead 1 year
+        for(let i=0; i<365; i++) {
             const checkDate = new Date();
             checkDate.setDate(today.getDate() + i);
             
-            // Get budget for the specific month of the date we are checking
-            const monthlyBudget = window.getBudgetForDate(checkDate);
-            if (monthlyBudget <= 0) continue; 
-
-            // Calculate Balance on this specific date
-            const mKey = window.getMonthKey(checkDate);
-            const dKey = checkDate.getDate();
-            const daysInMonth = new Date(checkDate.getFullYear(), checkDate.getMonth()+1, 0).getDate();
-            const dailyRate = monthlyBudget / daysInMonth;
-            const accrued = dailyRate * dKey;
-
-            let spentSoFar = 0;
-            if(window.appData[mKey] && window.appData[mKey].expenses) {
-                 Object.keys(window.appData[mKey].expenses).forEach(dayStr => {
-                     const d = parseInt(dayStr);
-                     if(d <= dKey) {
-                         window.appData[mKey].expenses[dayStr].forEach(e => spentSoFar += e.amount);
-                     }
-                 });
-            }
-
-            if ( (accrued - spentSoFar - amount) >= -0.01 ) { 
+            // USE THE NEW SAFE CHECK
+            if(window.isSafeToSpend(amount, checkDate)) {
                 return checkDate;
             }
         }
@@ -1039,9 +1042,7 @@
         
         document.getElementById('currentMonthLabel').textContent = window.currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-        // Update input to show current month's resolved budget
         const currentBudget = window.getBudgetForDate(window.currentDate);
-        // Only update input if not focused to avoid typing glitch
         if(document.activeElement !== document.getElementById('budgetInput')) {
             document.getElementById('budgetInput').value = currentBudget || '';
         }
@@ -1066,8 +1067,6 @@
 
         for(let day=1; day<=daysInMonth; day++) {
             const dateObj = new Date(y, m, day);
-            
-            // Check if past
             const isPast = (dateObj < new Date(today.setHours(0,0,0,0)));
 
             const cell = document.createElement('div');
@@ -1075,14 +1074,13 @@
             
             if(isCurrentMonth && day === today.getDate()) cell.classList.add('today');
             
-            // NEW: Add logic for showing/hiding
+            // Logic for hiding past days on mobile
             if(isPast) {
-                if(!window.showHistory) {
-                    cell.classList.add('hidden-mobile'); // Helper class controlled by CSS media queries
-                } else {
-                    // If show history ON, we still want visual distinction (grey out)
-                    cell.style.opacity = '0.5';
-                    cell.style.background = '#f1f5f9';
+                cell.classList.add('hidden-mobile'); // CSS handles display:none for mobile, opacity for desktop
+                if(window.showHistory) {
+                   cell.classList.remove('hidden-mobile'); // Show it
+                   cell.style.opacity = '0.5'; // But keep it visual grey
+                   cell.style.background = '#f1f5f9';
                 }
             }
 
@@ -1128,7 +1126,7 @@
         document.getElementById('expenseAmount').value = '';
         document.getElementById('expenseDesc').value = '';
         document.getElementById('expenseLink').value = '';
-        document.getElementById('expenseTax').checked = true; // Default True
+        document.getElementById('expenseTax').checked = true; 
         document.getElementById('modalSaveBtn').textContent = "Save Item";
 
         window.renderModalList();
@@ -1172,16 +1170,13 @@
         const monthKey = window.getMonthKey(window.selectedDate);
         const day = window.selectedDate.getDate();
         
-        // Remove from calendar
         const item = window.appData[monthKey].expenses[day].splice(idx, 1)[0];
         
-        // Add to pending
         if(!window.appData.pending) window.appData.pending = [];
         window.appData.pending.push(item);
         
         window.saveToCloud();
         
-        // If we were editing this item, cancel edit mode
         if(idx === window.editingExpenseIndex) {
              window.editingExpenseIndex = -1;
              document.getElementById('modalSaveBtn').textContent = "Save Item";
@@ -1190,7 +1185,7 @@
 
         window.renderModalList();
         window.renderCalendar();
-        window.renderPendingList(); // Update count on main screen
+        window.renderPendingList();
     };
 
     window.prepareEditExpense = (idx) => {
@@ -1201,7 +1196,7 @@
         document.getElementById('expenseAmount').value = item.amount;
         document.getElementById('expenseDesc').value = item.desc;
         document.getElementById('expenseLink').value = item.link || '';
-        document.getElementById('expenseTax').checked = false; // Assumed tax included
+        document.getElementById('expenseTax').checked = false; 
         document.getElementById('modalSaveBtn').textContent = "Update Item";
         
         window.editingExpenseIndex = idx;
@@ -1225,7 +1220,6 @@
             amt = Math.round(amt * 100) / 100;
         }
 
-        // VALIDATION
         if(!window.checkExpenseLimit(amt, window.selectedDate)) return;
 
         const newItem = {
