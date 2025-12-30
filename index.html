@@ -163,29 +163,73 @@
             padding: 4px; font-size: 0.8rem; width: 110px; border: 1px solid #ccc;
         }
 
-        /* --- CALENDAR GRID --- */
-        .calendar-header {
-            display: grid; grid-template-columns: repeat(7, 1fr); text-align: center;
-            font-weight: bold; color: var(--text-sub); margin-bottom: 8px; font-size: 0.85rem;
-        }
+        /* --- CALENDAR GRID FIXES --- */
+.calendar-grid {
+    display: grid; 
+    grid-template-columns: repeat(7, 1fr); 
+    /* The grid handles width, the cells handle height */
+}
 
-        .calendar-grid {
-            display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
-            background-color: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
-        }
+.calendar-day {
+    background-color: var(--surface); 
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    padding: 4px; 
+    position: relative; 
+    cursor: pointer;
+    display: flex; 
+    flex-direction: column;
+    /* STRICT SIZING: */
+    height: 120px; 
+    overflow: hidden; 
+}
 
-        .day-cell {
-            background-color: var(--surface); min-height: 110px; padding: 8px;
-            display: flex; flex-direction: column; cursor: pointer;
-        }
-        .day-cell:hover { background-color: #f8fafc; }
-        .day-cell.today { background-color: #eff6ff; }
-        .day-cell.hidden-mobile { display: flex; }
-        
-        .date-number { font-weight: 700; display: flex; justify-content: space-between; margin-bottom: 5px; }
-        .day-weekday { display: none; }
-        
-        .expense-chips { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; }
+/* Container for the list of items inside a day */
+.day-expenses-container {
+    flex: 1; /* Take up remaining vertical space */
+    overflow-y: auto; /* Scroll internally if too many items */
+    min-height: 0; /* Required for nested flex scrolling */
+    margin-top: 2px;
+    
+    /* Thin, subtle scrollbar */
+    scrollbar-width: thin; 
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+/* Webkit scrollbar styling */
+.day-expenses-container::-webkit-scrollbar { width: 4px; }
+.day-expenses-container::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+
+/* The individual expense pill */
+.expense-chip { 
+    font-size: 0.75rem; 
+    color: var(--text-sub); 
+    background: #f1f5f9; 
+    padding: 2px 6px; 
+    border-radius: 4px;
+    margin-bottom: 2px;
+    
+    /* TRUNCATION MAGIC */
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+    display: block; 
+    max-width: 100%;
+}
+
+.chip-desc-text { 
+    opacity: 0.8; 
+    margin-left: 4px; 
+    font-weight: normal; 
+}
+
+/* Mobile Overrides: Allow flexible height on small screens */
+@media (max-width: 767px) {
+    .calendar-day {
+        min-height: 80px; 
+        height: auto; /* Let it grow on mobile */
+    }
+}
         
         /* Updated Chip Style: Truncation logic */
         .expense-chip { 
@@ -363,8 +407,8 @@
     </header>
 
     <div id="loginPrompt" style="display:none;">
-        <h2 style="margin-top:0;">Family Login</h2>
-        <p style="color:var(--text-sub); margin-bottom:20px;">Shared budget access.</p>
+        <h2 style="margin-top:0;">Login</h2>
+        <p style="color:var(--text-sub); margin-bottom:20px;">PaceBudget account access.</p>
         <form onsubmit="handleLogin(event)">
             <input type="email" id="email" class="login-input" placeholder="Email" autocomplete="username" required>
             <input type="password" id="password" class="login-input" placeholder="Password" autocomplete="current-password" required>
@@ -1440,7 +1484,7 @@
         return null;
     };
 
-   // --- CALENDAR RENDER (With "Look-Ahead" True Availability) ---
+// --- CALENDAR RENDER (Fixed Layout) ---
     window.renderCalendar = () => {
         const grid = document.getElementById('calendarGrid');
         grid.innerHTML = '';
@@ -1451,7 +1495,6 @@
         document.getElementById('currentMonthLabel').textContent = window.currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
         const currentBudget = window.getBudgetForDate(window.currentDate);
-        // Only update input if not focused
         if(document.activeElement !== document.getElementById('budgetInput')) {
             document.getElementById('budgetInput').value = currentBudget || '';
         }
@@ -1463,33 +1506,29 @@
         const today = new Date();
         const isCurrentMonth = (today.getFullYear() === y && today.getMonth() === m);
 
-        // --- STEP 1: PRE-CALCULATE BALANCES ---
+        // --- PRE-CALCULATE BALANCES ---
         const monthKey = window.getMonthKey(window.currentDate);
         const expensesMap = (window.appData[monthKey] && window.appData[monthKey].expenses) ? window.appData[monthKey].expenses : {};
         
-        const rawBalances = [];  // Technical balance on that specific day
-        const safeBalances = []; // The "True Available" (lowest future dip)
-        
+        const rawBalances = [];
+        const safeBalances = [];
         let tempRunningSpent = 0;
 
-        // 1. Calculate Raw Balances (Standard)
         for(let d=1; d<=daysInMonth; d++) {
             const dayExpenses = expensesMap[d] || [];
             const dayCost = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
             tempRunningSpent += dayCost;
-            
             const accrued = dailyRate * d;
             rawBalances[d] = accrued - tempRunningSpent;
         }
 
-        // 2. Calculate Safe Balances (Look-Ahead / Backwards Ripple)
         let minFuture = Infinity;
         for(let d=daysInMonth; d>=1; d--) {
             if(rawBalances[d] < minFuture) minFuture = rawBalances[d];
             safeBalances[d] = minFuture;
         }
         
-        // --- STEP 1.5: UPDATE MONTH SUMMARY ---
+        // --- UPDATE SUMMARY ---
         const totalScheduled = tempRunningSpent;
         const totalBudgetVal = currentBudget || 0;
         const remainingMonth = totalBudgetVal - totalScheduled;
@@ -1498,21 +1537,21 @@
         if(totalBudgetVal > 0) {
             summaryDiv.innerHTML = `
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span>Spent/Scheduled: <strong>$${totalScheduled.toFixed(0)}</strong></span>
+                    <span>Spent: <strong>$${totalScheduled.toFixed(0)}</strong></span>
                     <span>Budget: <strong>$${totalBudgetVal.toFixed(0)}</strong></span>
                 </div>
                 <div style="width:100%; background:#e2e8f0; height:6px; border-radius:3px; overflow:hidden;">
                     <div style="width:${Math.min((totalScheduled/totalBudgetVal)*100, 100)}%; background:${remainingMonth >= 0 ? 'var(--primary)' : 'var(--danger)'}; height:100%;"></div>
                 </div>
                 <div style="text-align:right; font-size:0.75rem; color:${remainingMonth >= 0 ? 'var(--success)' : 'var(--danger)'}; margin-top:2px;">
-                    ${remainingMonth >= 0 ? 'Remaining Capacity: $' + remainingMonth.toFixed(0) : 'Over Budget: $' + Math.abs(remainingMonth).toFixed(0)}
+                    ${remainingMonth >= 0 ? 'Remaining: $' + remainingMonth.toFixed(0) : 'Over: $' + Math.abs(remainingMonth).toFixed(0)}
                 </div>
             `;
         } else {
             summaryDiv.innerHTML = "Set a budget above to see monthly progress.";
         }
 
-        // --- STEP 2: RENDER GRID ---
+        // --- RENDER GRID ---
         for(let i=0; i<firstDayOfMonth; i++) {
             const d = document.createElement('div');
             d.className = 'day-cell empty';
@@ -1539,24 +1578,29 @@
 
             const dayExpenses = expensesMap[day] || [];
             const balance = safeBalances[day];
-            const dayName = dateObj.toLocaleDateString('en-US', {weekday:'short'});
-
+            
+            // Build the Chips HTML (Note the chip-desc-text span for styling)
             let chipsHtml = '';
             dayExpenses.forEach(exp => {
-                chipsHtml += `<div class="expense-chip" title="${exp.desc}">
-                    ${exp.icon || '💸'} $${exp.amount.toFixed(0)} <span class="chip-desc-text">${exp.desc}</span>
+                const desc = exp.desc || 'Item';
+                chipsHtml += `<div class="expense-chip" title="${desc} - $${exp.amount.toFixed(2)}">
+                    ${exp.icon || '💸'} $${exp.amount.toFixed(0)} <span class="chip-desc-text">${desc}</span>
                 </div>`;
             });
 
             const balClass = balance >= -0.01 ? 'bal-pos' : 'bal-neg';
 
+            // STRUCTURE: Header (Fixed) + Container (Scrollable) + Balance (Fixed)
             cell.innerHTML = `
-                <div class="date-number">
-                    <span>${day}</span>
-                    <span class="day-weekday">${dayName}</span>
+                <div class="day-header" style="display:flex; justify-content:space-between; margin-bottom:2px;">
+                    <span class="day-num" style="font-weight:700;">${day}</span>
                 </div>
-                <div class="expense-chips">${chipsHtml}</div>
-                <div class="balance-indicator ${balClass}">$${balance.toFixed(0)}</div>
+                
+                <div class="day-expenses-container">
+                    ${chipsHtml}
+                </div>
+
+                <div class="balance-indicator ${balClass}" style="margin-top:auto;">$${balance.toFixed(0)}</div>
             `;
             
             cell.onclick = () => window.openModal(day, dayExpenses);
