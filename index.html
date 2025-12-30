@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#f1f5f9">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📉</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%232563eb'/%3E%3Cstop offset='100%25' stop-color='%2316a34a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='50' r='45' fill='url(%23g)'/%3E%3Ctext x='50' y='65' font-size='50' font-family='Arial, sans-serif' font-weight='bold' fill='white' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E">
     
     <title>PaceBudget</title>
     <style>
@@ -41,6 +41,10 @@
             display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
         }
 
+        /* Username Display */
+        .user-area { display: flex; align-items: center; gap: 10px; }
+        .user-name-display { font-weight: 600; color: var(--text-main); font-size: 0.9rem; text-align: right;}
+
         .profile-btn {
             background: #e2e8f0; color: var(--text-main); 
             width: 40px; height: 40px; border-radius: 50%; 
@@ -55,10 +59,14 @@
             display: flex; flex-direction: column; gap: 15px;
         }
 
-        .month-nav { display: flex; align-items: center; gap: 15px; justify-content: center; position: relative; }
-        .month-nav h2 { margin: 0; font-size: 1.1rem; min-width: 140px; text-align: center; }
+        /* FIXED: Month Nav is now strictly flex, preventing overlapping */
+        .month-nav { display: flex; align-items: center; gap: 10px; justify-content: center; width: 100%; }
+        .month-nav h2 { margin: 0; font-size: 1.1rem; min-width: 130px; text-align: center; }
         
-        .jump-today { position: absolute; right: 0; font-size: 0.8rem; color: var(--primary); cursor: pointer; text-decoration: underline; }
+        .jump-today { 
+            font-size: 0.8rem; color: var(--primary); cursor: pointer; text-decoration: underline; 
+            margin-left: 5px; white-space: nowrap;
+        }
 
         .budget-row { display: flex; align-items: center; gap: 10px; font-weight: 500; }
         
@@ -162,6 +170,7 @@
         }
         .day-cell:hover { background-color: #f8fafc; }
         .day-cell.today { background-color: #eff6ff; }
+        .day-cell.hidden-mobile { display: flex; } /* Default visible on desktop */
         
         .date-number { font-weight: 700; display: flex; justify-content: space-between; margin-bottom: 5px; }
         .day-weekday { display: none; }
@@ -282,7 +291,8 @@
             <h1 style="margin:0; font-size:1.2rem; font-weight:800; color:var(--primary);">PaceBudget</h1>
             <button class="btn-text" onclick="openHelp()" style="font-size:1.1rem; width:30px; height:30px; border-radius:50%; border:1px solid #ccc; display:flex; align-items:center; justify-content:center;">?</button>
         </div>
-        <div id="userDisplay" style="display:none;">
+        <div id="userDisplay" style="display:none;" class="user-area">
+            <span id="headerUserName" class="user-name-display"></span>
             <div class="profile-btn" onclick="openSettings()">👤</div>
         </div>
     </header>
@@ -623,6 +633,9 @@
         if(document.getElementById('settingsModal').classList.contains('active')) {
             window.renderSettings();
         }
+        // Update header user name
+        const name = window.appData.displayName || "Family";
+        document.getElementById('headerUserName').textContent = name;
     }
 </script>
 
@@ -718,8 +731,11 @@
     };
 
     window.saveUserName = () => {
-        window.appData.displayName = document.getElementById('userNameInput').value;
+        const newName = document.getElementById('userNameInput').value;
+        window.appData.displayName = newName;
         window.saveToCloud();
+        // Update header immediately
+        document.getElementById('headerUserName').textContent = newName || "Family";
     };
 
     window.addNewEmail = () => {
