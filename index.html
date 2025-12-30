@@ -50,7 +50,7 @@
         }
 
         .month-nav { display: flex; align-items: center; gap: 15px; justify-content: center; }
-        .month-nav h2 { margin: 0; font-size: 1.1rem; min-width: 120px; text-align: center; }
+        .month-nav h2 { margin: 0; font-size: 1.1rem; min-width: 140px; text-align: center; }
 
         .budget-row { display: flex; align-items: center; gap: 10px; font-weight: 500; }
         .top-actions { display: flex; gap: 10px; }
@@ -283,7 +283,7 @@
             </div>
             
             <div class="budget-row">
-                <span style="flex-grow:1;">Monthly Budget:</span>
+                <span style="flex-grow:1;">This Month's Budget:</span>
                 <input type="number" id="budgetInput" onchange="updateBudget()" placeholder="0" style="width:100px; text-align:right;">
             </div>
 
@@ -306,7 +306,7 @@
                 </div>
                 
                 <label class="checkbox-wrapper">
-                    <input type="checkbox" id="pendingTax"> Include 10% Sales Tax
+                    <input type="checkbox" id="pendingTax" checked> Include 10% Sales Tax
                 </label>
 
                 <div class="link-row">
@@ -344,7 +344,7 @@
                 <input type="number" id="expenseAmount" step="0.01" placeholder="0.00" style="width:100%; font-size:1.2rem; padding:12px;">
             </div>
             <label class="checkbox-wrapper" style="margin-bottom:10px;">
-                <input type="checkbox" id="expenseTax"> Include 10% Sales Tax
+                <input type="checkbox" id="expenseTax" checked> Include 10% Sales Tax
             </label>
             
             <div style="margin-bottom:10px;">
@@ -437,7 +437,7 @@
     let unsubscribe = null; 
 
     // Initialize global immediately so UI doesn't crash on load
-    window.appData = { pending: [], emailList: [], budget: 0, displayName: '' };
+    window.appData = { pending: [], emailList: [], budgets: {}, displayName: '' };
 
     // --- AUTH ---
     window.handleLogin = (e) => { e.preventDefault(); window.login(); };
@@ -482,12 +482,18 @@
                 window.appData = docSnap.data();
                 if (!window.appData.pending) window.appData.pending = [];
                 if (!window.appData.emailList) window.appData.emailList = [];
-                // Sync the main budget input if it's not currently focused
-                if(document.activeElement !== document.getElementById('budgetInput')) {
-                    document.getElementById('budgetInput').value = window.appData.budget || 0;
+                if (!window.appData.budgets) {
+                    // Migration: if old single budget exists, move to current month
+                    if(window.appData.budget) {
+                        const mKey = window.getMonthKey(new Date());
+                        window.appData.budgets = {};
+                        window.appData.budgets[mKey] = window.appData.budget;
+                    } else {
+                        window.appData.budgets = {};
+                    }
                 }
             } else {
-                window.appData = { pending: [], emailList: [], budget: 0, displayName: '' };
+                window.appData = { pending: [], emailList: [], budgets: {}, displayName: '' };
             }
             window.refreshUI();
         });
@@ -554,14 +560,52 @@
         window.renderCalendar();
     };
 
-    // --- BUDGET & SETTINGS LOGIC ---
+    // --- INDEPENDENT BUDGET LOGIC ---
+    
+    // Gets budget for specific month, or falls back to most recent previous month setting
+    window.getBudgetForDate = (dateObj) => {
+        if(!window.appData.budgets) return 0;
+        
+        // 1. Try exact month
+        const key = window.getMonthKey(dateObj);
+        if(window.appData.budgets[key] !== undefined) return window.appData.budgets[key];
+
+        // 2. Find most recent past budget
+        // We look at all keys, filter for those BEFORE this date, sort descending
+        const sortedKeys = Object.keys(window.appData.budgets).sort().reverse();
+        for(let k of sortedKeys) {
+            if(k < key) return window.appData.budgets[k];
+        }
+
+        return 0; // No budget ever set
+    };
+
     window.updateBudget = () => {
         const val = parseFloat(document.getElementById('budgetInput').value) || 0;
-        window.appData.budget = val; 
+        const key = window.getMonthKey(window.currentDate);
+        
+        if(!window.appData.budgets) window.appData.budgets = {};
+        window.appData.budgets[key] = val;
+        
         window.saveToCloud();
         window.renderCalendar();
     };
 
+    // --- VALIDATOR FOR EXPENSE SIZE ---
+    window.checkExpenseLimit = (amount, dateContext) => {
+        const budget = window.getBudgetForDate(dateContext);
+        if(budget <= 0) return true; // No budget set, technically no limit, or allow basic usage
+        
+        const limit = budget / 3;
+        
+        if (amount > limit) {
+            alert(`⚠️ Expense Limit Reached\n\nTo ensure budget stability, individual expenses cannot exceed 1/3 of the monthly budget.\n\nLimit: $${limit.toFixed(2)}\nAttempted: $${amount.toFixed(2)}`);
+            return false;
+        }
+        return true;
+    }
+
+    // --- SETTINGS ---
     window.openSettings = () => {
         document.getElementById('settingsModal').classList.add('active');
         window.renderSettings();
@@ -569,10 +613,7 @@
     window.closeSettings = () => document.getElementById('settingsModal').classList.remove('active');
 
     window.renderSettings = () => {
-        // Name
         document.getElementById('userNameInput').value = window.appData.displayName || '';
-        
-        // Emails
         const c = document.getElementById('emailListContainer');
         c.innerHTML = '';
         (window.appData.emailList || []).forEach((email, idx) => {
@@ -682,12 +723,6 @@
     window.applySmartSchedule = () => {
         if(!confirm("Reschedule all upcoming expenses to fit your budget?")) return;
 
-        const monthlyBudget = window.appData.budget || 0;
-        if (monthlyBudget <= 0) {
-            alert("Please set a monthly budget first.");
-            return;
-        }
-
         // 1. CLEAR existing future expenses
         const today = new Date();
         today.setHours(0,0,0,0);
@@ -714,9 +749,15 @@
             let safety = 0;
 
             while (!placed && safety < 730) {
-                // Check if placing item on dateCursor is valid for the REST of that month
-                // Validity rule: Balance(d) >= 0 for all d >= dateCursor.day in that month
-                
+                // Get budget for this specific month we are checking
+                const monthlyBudget = window.getBudgetForDate(dateCursor);
+                if (monthlyBudget <= 0) {
+                    // Skip months with no budget
+                    dateCursor.setDate(dateCursor.getDate() + 1);
+                    safety++;
+                    continue;
+                }
+
                 const y = dateCursor.getFullYear();
                 const m = dateCursor.getMonth();
                 const dStart = dateCursor.getDate();
@@ -802,6 +843,9 @@
             amt = Math.round(amt * 100) / 100; 
         }
 
+        // VALIDATION
+        if(!window.checkExpenseLimit(amt, window.currentDate)) return;
+
         if (!window.appData.pending) window.appData.pending = [];
 
         const newItem = {
@@ -822,7 +866,7 @@
         }
         
         amtInput.value = ''; descInput.value = ''; linkInput.value = '';
-        taxInput.checked = false;
+        taxInput.checked = true; // DEFAULT TRUE
         window.saveToCloud();
     };
 
@@ -831,7 +875,7 @@
         document.getElementById('pendingAmount').value = item.amount;
         document.getElementById('pendingDesc').value = item.desc;
         document.getElementById('pendingLink').value = item.link || '';
-        document.getElementById('pendingTax').checked = false; 
+        document.getElementById('pendingTax').checked = false; // assumed tax already included in stored amount
         
         window.editingPendingIndex = idx;
         document.getElementById('addPendingBtn').textContent = "Update";
@@ -845,6 +889,7 @@
         document.getElementById('pendingAmount').value = '';
         document.getElementById('pendingDesc').value = '';
         document.getElementById('pendingLink').value = '';
+        document.getElementById('pendingTax').checked = true;
         document.getElementById('addPendingBtn').textContent = "Add to List";
         document.getElementById('cancelPendingEditBtn').style.display = 'none';
         window.renderPendingList();
@@ -866,14 +911,12 @@
             div.className = 'pending-item';
             if(idx === window.editingPendingIndex) div.classList.add('editing');
             
-            // Find next date logic
             const suggestedDate = window.findNextAffordableDate(item.amount);
             let smartBtnHtml = '';
             
             if(suggestedDate) {
                  smartBtnHtml = `<button class="btn-success btn-sm" onclick="commitPending(${idx}, '${suggestedDate.toISOString()}')">Smart Schedule ${suggestedDate.toLocaleDateString('en-US', {month:'short', day:'numeric'})}</button>`;
             } else {
-                 // Fallback if loop ends (item > budget?) -> Suggest next month 1st or just disabled
                  smartBtnHtml = `<button class="btn-outline btn-sm" disabled style="opacity:0.5;">Too Large for Budget</button>`;
             }
             
@@ -939,14 +982,15 @@
     };
 
     window.findNextAffordableDate = (amount) => {
-        const monthlyBudget = window.appData.budget || 0;
-        if (monthlyBudget <= 0) return null;
-
         const today = new Date();
         // Look ahead 2 years
         for(let i=0; i<730; i++) {
             const checkDate = new Date();
             checkDate.setDate(today.getDate() + i);
+            
+            // Get budget for the specific month of the date we are checking
+            const monthlyBudget = window.getBudgetForDate(checkDate);
+            if (monthlyBudget <= 0) continue; 
 
             // Calculate Balance on this specific date
             const mKey = window.getMonthKey(checkDate);
@@ -982,9 +1026,16 @@
         
         document.getElementById('currentMonthLabel').textContent = window.currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
+        // Update input to show current month's resolved budget
+        const currentBudget = window.getBudgetForDate(window.currentDate);
+        // Only update input if not focused to avoid typing glitch
+        if(document.activeElement !== document.getElementById('budgetInput')) {
+            document.getElementById('budgetInput').value = currentBudget || '';
+        }
+
         const firstDayOfMonth = new Date(y, m, 1).getDay();
         const daysInMonth = new Date(y, m + 1, 0).getDate();
-        const dailyRate = (window.appData.budget || 0) / daysInMonth;
+        const dailyRate = (currentBudget || 0) / daysInMonth;
 
         const today = new Date();
         const isCurrentMonth = (today.getFullYear() === y && today.getMonth() === m);
@@ -1060,7 +1111,7 @@
         document.getElementById('expenseAmount').value = '';
         document.getElementById('expenseDesc').value = '';
         document.getElementById('expenseLink').value = '';
-        document.getElementById('expenseTax').checked = false;
+        document.getElementById('expenseTax').checked = true; // Default True
         document.getElementById('modalSaveBtn').textContent = "Save Item";
 
         window.renderModalList();
@@ -1107,7 +1158,7 @@
         document.getElementById('expenseAmount').value = item.amount;
         document.getElementById('expenseDesc').value = item.desc;
         document.getElementById('expenseLink').value = item.link || '';
-        document.getElementById('expenseTax').checked = false;
+        document.getElementById('expenseTax').checked = false; // Assumed tax included
         document.getElementById('modalSaveBtn').textContent = "Update Item";
         
         window.editingExpenseIndex = idx;
@@ -1130,6 +1181,9 @@
             amt = amt * 1.1;
             amt = Math.round(amt * 100) / 100;
         }
+
+        // VALIDATION
+        if(!window.checkExpenseLimit(amt, window.selectedDate)) return;
 
         const newItem = {
             amount: amt,
@@ -1156,7 +1210,7 @@
         window.saveToCloud();
         
         amtInput.value = ''; descInput.value = ''; linkInput.value = '';
-        taxInput.checked = false;
+        taxInput.checked = true;
         document.getElementById('modalSaveBtn').textContent = "Save Item";
         
         window.renderModalList();
