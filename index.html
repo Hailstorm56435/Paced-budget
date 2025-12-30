@@ -41,7 +41,6 @@
             display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
         }
 
-        /* Username Display */
         .user-area { display: flex; align-items: center; gap: 10px; }
         .user-name-display { font-weight: 600; color: var(--text-main); font-size: 0.9rem; text-align: right;}
 
@@ -59,7 +58,6 @@
             display: flex; flex-direction: column; gap: 15px;
         }
 
-        /* FIXED: Month Nav is now strictly flex, preventing overlapping */
         .month-nav { display: flex; align-items: center; gap: 10px; justify-content: center; width: 100%; }
         .month-nav h2 { margin: 0; font-size: 1.1rem; min-width: 130px; text-align: center; }
         
@@ -170,7 +168,7 @@
         }
         .day-cell:hover { background-color: #f8fafc; }
         .day-cell.today { background-color: #eff6ff; }
-        .day-cell.hidden-mobile { display: flex; } /* Default visible on desktop */
+        .day-cell.hidden-mobile { display: flex; }
         
         .date-number { font-weight: 700; display: flex; justify-content: space-between; margin-bottom: 5px; }
         .day-weekday { display: none; }
@@ -193,7 +191,6 @@
             .calendar-header { display: none; }
             .calendar-grid { display: flex; flex-direction: column; gap: 0; background: transparent; border: none; }
             
-            /* Mobile: Hide past days completely if toggled off */
             .day-cell.hidden-mobile { display: none !important; }
 
             .day-cell {
@@ -223,7 +220,6 @@
             #historyToggleContainer { display: block; }
         }
 
-        /* Desktop: Ensure toggle is hidden and cells are just greyed out, not removed */
         @media (min-width: 601px) {
             #historyToggleContainer { display: none !important; }
             .day-cell.hidden-mobile { display: flex !important; opacity: 0.4; background: #f8fafc; }
@@ -421,6 +417,29 @@
         </div>
 
         <div style="margin-bottom:20px; border-top:1px solid #eee; padding-top:15px;">
+            <h4 style="margin:0 0 10px 0;">Account Security</h4>
+            <div style="font-size:0.85rem; margin-bottom:10px;">Logged in as: <strong id="currentUserEmailDisplay"></strong></div>
+            
+            <button class="btn-outline btn-sm" onclick="toggleSecurityForms()" style="width:100%;">Manage Credentials</button>
+            
+            <div id="securityForms" style="display:none; margin-top:15px;">
+                <div style="margin-bottom:15px; background:#f8fafc; padding:10px; border-radius:8px;">
+                    <label style="font-size:0.8rem;">New Email</label>
+                    <input type="email" id="newLoginEmail" placeholder="New Email">
+                    <input type="email" id="confirmLoginEmail" placeholder="Confirm New Email" style="margin-top:5px;">
+                    <button class="btn-sm" style="margin-top:5px;" onclick="changeLoginEmail()">Update Email</button>
+                </div>
+
+                <div style="background:#f8fafc; padding:10px; border-radius:8px;">
+                    <label style="font-size:0.8rem;">New Password</label>
+                    <input type="password" id="newLoginPass" placeholder="New Password">
+                    <input type="password" id="confirmLoginPass" placeholder="Confirm New Password" style="margin-top:5px;">
+                    <button class="btn-sm" style="margin-top:5px;" onclick="changeLoginPass()">Update Password</button>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-bottom:20px; border-top:1px solid #eee; padding-top:15px;">
             <h4 style="margin:0 0 5px 0;">Email Notifications</h4>
             <p style="font-size:0.8rem; color:var(--text-sub); background:#eef2ff; padding:10px; border-radius:8px; line-height:1.4;">
                 <strong>Note:</strong> Emails in this list will receive a report of items 
@@ -514,7 +533,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateEmail, updatePassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     // --- CONFIG ---
@@ -566,6 +585,8 @@
             document.getElementById('userDisplay').style.display = 'flex';
             document.getElementById('appContent').style.display = 'block';
             document.getElementById('loginPrompt').style.display = 'none';
+            // Set email in settings
+            document.getElementById('currentUserEmailDisplay').textContent = user.email;
             startDataListener(user.uid);
         } else {
             document.getElementById('userDisplay').style.display = 'none';
@@ -574,6 +595,57 @@
             if (unsubscribe) unsubscribe();
         }
     });
+
+    // --- CREDENTIAL MANAGEMENT ---
+    window.toggleSecurityForms = () => {
+        const forms = document.getElementById('securityForms');
+        forms.style.display = forms.style.display === 'none' ? 'block' : 'none';
+    };
+
+    window.changeLoginEmail = () => {
+        const email1 = document.getElementById('newLoginEmail').value;
+        const email2 = document.getElementById('confirmLoginEmail').value;
+        
+        if(!email1 || email1 !== email2) {
+            alert("Email addresses do not match or are empty.");
+            return;
+        }
+        
+        if(!confirm("Are you sure you want to change your login email?")) return;
+
+        if(currentUser) {
+            updateEmail(currentUser, email1).then(() => {
+                alert("Email updated successfully!");
+                document.getElementById('currentUserEmailDisplay').textContent = email1;
+                document.getElementById('newLoginEmail').value = '';
+                document.getElementById('confirmLoginEmail').value = '';
+            }).catch(err => {
+                alert("Error: " + err.message + "\n\n(You may need to sign out and sign in again to perform sensitive actions.)");
+            });
+        }
+    };
+
+    window.changeLoginPass = () => {
+        const pass1 = document.getElementById('newLoginPass').value;
+        const pass2 = document.getElementById('confirmLoginPass').value;
+        
+        if(!pass1 || pass1 !== pass2) {
+            alert("Passwords do not match or are empty.");
+            return;
+        }
+        
+        if(!confirm("Are you sure you want to change your password?")) return;
+
+        if(currentUser) {
+            updatePassword(currentUser, pass1).then(() => {
+                alert("Password updated successfully!");
+                document.getElementById('newLoginPass').value = '';
+                document.getElementById('confirmLoginPass').value = '';
+            }).catch(err => {
+                alert("Error: " + err.message + "\n\n(You may need to sign out and sign in again to perform sensitive actions.)");
+            });
+        }
+    }
 
     function startDataListener(uid) {
         unsubscribe = onSnapshot(doc(db, "users", uid), (docSnap) => {
@@ -647,6 +719,9 @@
     window.showHistory = false;
     window.editingPendingIndex = -1; 
     window.editingExpenseIndex = -1;
+    // Rescheduling state
+    window.reschedulingIndex = -1; 
+    
     // Temp storage for the queue tool
     window.tempQueue = [];
 
@@ -1276,6 +1351,8 @@
     window.openModal = (day, expenses) => {
         window.selectedDate = new Date(window.currentDate.getFullYear(), window.currentDate.getMonth(), day);
         window.editingExpenseIndex = -1;
+        window.reschedulingIndex = -1; // Reset reschedule state
+        
         document.getElementById('modalTitle').textContent = `Edit ${window.selectedDate.toLocaleDateString('en-US', {month:'short', day:'numeric'})}`;
         document.getElementById('expenseModal').classList.add('active');
         
@@ -1305,21 +1382,84 @@
             div.className = 'expense-list-item';
             if(idx === window.editingExpenseIndex) div.classList.add('editing');
 
-            let linkHtml = item.link ? `<a href="${item.link}" target="_blank" onclick="event.stopPropagation()">🔗</a>` : '';
-
-            div.innerHTML = `
-                <div>
-                    <div style="font-weight:600;">$${item.amount.toFixed(2)}</div>
-                    <div style="font-size:0.85rem; color:#666;">${item.icon||''} ${item.desc} ${linkHtml}</div>
-                </div>
-                <div>
-                    <button class="btn-text" title="Move to Unscheduled" onclick="unscheduleExpense(${idx})">📂</button>
-                    <button class="btn-text" onclick="prepareEditExpense(${idx})">✎</button>
-                    <button class="btn-text" style="color:var(--danger);" onclick="deleteExpense(${idx})">×</button>
-                </div>
-            `;
+            // --- RESCHEDULING UI vs NORMAL UI ---
+            if(idx === window.reschedulingIndex) {
+                // Determine today string for min date
+                const todayStr = new Date().toISOString().split('T')[0];
+                
+                div.innerHTML = `
+                    <div style="flex-grow:1; display:flex; flex-direction:column; gap:5px;">
+                        <span style="font-size:0.85rem; font-weight:bold;">Move "${item.desc}" to:</span>
+                        <div style="display:flex; gap:5px;">
+                            <input type="date" id="rescheduleDateInput-${idx}" min="${todayStr}" style="font-size:0.9rem; padding:6px;">
+                            <button class="btn-success btn-sm" onclick="performReschedule(${idx})">Go</button>
+                            <button class="btn-text" onclick="cancelReschedule()">Cancel</button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Standard View
+                let linkHtml = item.link ? `<a href="${item.link}" target="_blank" onclick="event.stopPropagation()">🔗</a>` : '';
+                div.innerHTML = `
+                    <div>
+                        <div style="font-weight:600;">$${item.amount.toFixed(2)}</div>
+                        <div style="font-size:0.85rem; color:#666;">${item.icon||''} ${item.desc} ${linkHtml}</div>
+                    </div>
+                    <div>
+                        <button class="btn-text" title="Reschedule" onclick="initReschedule(${idx})">📅</button>
+                        <button class="btn-text" title="Move to Unscheduled" onclick="unscheduleExpense(${idx})">📂</button>
+                        <button class="btn-text" onclick="prepareEditExpense(${idx})">✎</button>
+                        <button class="btn-text" style="color:var(--danger);" onclick="deleteExpense(${idx})">×</button>
+                    </div>
+                `;
+            }
             list.appendChild(div);
         });
+    };
+
+    // --- RESCHEDULE LOGIC ---
+    window.initReschedule = (idx) => {
+        window.reschedulingIndex = idx;
+        window.renderModalList();
+    };
+
+    window.cancelReschedule = () => {
+        window.reschedulingIndex = -1;
+        window.renderModalList();
+    };
+
+    window.performReschedule = (idx) => {
+        const dateInput = document.getElementById(`rescheduleDateInput-${idx}`);
+        if(!dateInput.value) {
+            alert("Please pick a date.");
+            return;
+        }
+        
+        // Parse target date
+        const parts = dateInput.value.split('-'); // YYYY-MM-DD
+        const targetDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+        
+        // 1. Remove from current day
+        const monthKey = window.getMonthKey(window.selectedDate);
+        const day = window.selectedDate.getDate();
+        const item = window.appData[monthKey].expenses[day].splice(idx, 1)[0];
+        
+        // 2. Add to new target day
+        const targetMKey = window.getMonthKey(targetDate);
+        const targetD = targetDate.getDate();
+        
+        if(!window.appData[targetMKey]) window.appData[targetMKey] = { expenses: {} };
+        if(!window.appData[targetMKey].expenses) window.appData[targetMKey].expenses = {};
+        if(!window.appData[targetMKey].expenses[targetD]) window.appData[targetMKey].expenses[targetD] = [];
+        
+        window.appData[targetMKey].expenses[targetD].push(item);
+        
+        // 3. Save & Refresh
+        window.saveToCloud();
+        window.reschedulingIndex = -1;
+        
+        window.renderModalList(); // Refresh list (item will disappear)
+        window.renderCalendar(); // Refresh balances
     };
 
     window.unscheduleExpense = (idx) => {
