@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f1f5f9">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📉</text></svg>">
+    
     <title>PaceBudget</title>
     <style>
         :root {
@@ -49,10 +55,18 @@
             display: flex; flex-direction: column; gap: 15px;
         }
 
-        .month-nav { display: flex; align-items: center; gap: 15px; justify-content: center; }
+        .month-nav { display: flex; align-items: center; gap: 15px; justify-content: center; position: relative; }
         .month-nav h2 { margin: 0; font-size: 1.1rem; min-width: 140px; text-align: center; }
+        
+        .jump-today { position: absolute; right: 0; font-size: 0.8rem; color: var(--primary); cursor: pointer; text-decoration: underline; }
 
         .budget-row { display: flex; align-items: center; gap: 10px; font-weight: 500; }
+        
+        .month-summary {
+            font-size: 0.85rem; color: var(--text-sub); background: #f8fafc;
+            padding: 8px; border-radius: 6px; text-align: center; border: 1px solid #e2e8f0;
+        }
+
         .top-actions { display: flex; gap: 10px; }
 
         /* --- BUTTONS & INPUTS --- */
@@ -203,7 +217,6 @@
         /* Desktop: Ensure toggle is hidden and cells are just greyed out, not removed */
         @media (min-width: 601px) {
             #historyToggleContainer { display: none !important; }
-            /* Force flex display even if class is present, just lower opacity */
             .day-cell.hidden-mobile { display: flex !important; opacity: 0.4; background: #f8fafc; }
         }
 
@@ -298,11 +311,16 @@
                 <button class="btn-outline btn-sm" onclick="changeMonth(-1)">←</button>
                 <h2 id="currentMonthLabel"></h2>
                 <button class="btn-outline btn-sm" onclick="changeMonth(1)">→</button>
+                <span class="jump-today" onclick="jumpToday()" title="Go to Today">Today</span>
             </div>
             
             <div class="budget-row">
                 <span style="flex-grow:1;">This Month's Budget:</span>
                 <input type="number" id="budgetInput" onchange="updateBudget()" placeholder="0" style="width:100px; text-align:right;">
+            </div>
+            
+            <div class="month-summary" id="monthSummary">
+                Loading...
             </div>
 
             <div class="top-actions">
@@ -430,6 +448,7 @@
         </div>
     </div>
 </div>
+
 <div class="modal" id="helpModal">
     <div class="modal-content" style="max-width:600px; max-height:90vh;">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:15px; margin-bottom:15px;">
@@ -629,6 +648,11 @@
 
     window.changeMonth = (dir) => {
         window.currentDate.setMonth(window.currentDate.getMonth() + dir);
+        window.renderCalendar();
+    };
+    
+    window.jumpToday = () => {
+        window.currentDate = new Date();
         window.renderCalendar();
     };
 
@@ -1149,6 +1173,31 @@
             if(rawBalances[d] < minFuture) minFuture = rawBalances[d];
             safeBalances[d] = minFuture;
         }
+        
+        // --- STEP 1.5: UPDATE MONTH SUMMARY ---
+        // Shows total scheduled spend vs total budget
+        const totalScheduled = tempRunningSpent;
+        const totalBudgetVal = currentBudget || 0;
+        const remainingMonth = totalBudgetVal - totalScheduled;
+        
+        const summaryDiv = document.getElementById('monthSummary');
+        if(totalBudgetVal > 0) {
+            summaryDiv.innerHTML = `
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span>Spent/Scheduled: <strong>$${totalScheduled.toFixed(0)}</strong></span>
+                    <span>Budget: <strong>$${totalBudgetVal.toFixed(0)}</strong></span>
+                </div>
+                <div style="width:100%; background:#e2e8f0; height:6px; border-radius:3px; overflow:hidden;">
+                    <div style="width:${Math.min((totalScheduled/totalBudgetVal)*100, 100)}%; background:${remainingMonth >= 0 ? 'var(--primary)' : 'var(--danger)'}; height:100%;"></div>
+                </div>
+                <div style="text-align:right; font-size:0.75rem; color:${remainingMonth >= 0 ? 'var(--success)' : 'var(--danger)'}; margin-top:2px;">
+                    ${remainingMonth >= 0 ? 'Remaining Capacity: $' + remainingMonth.toFixed(0) : 'Over Budget: $' + Math.abs(remainingMonth).toFixed(0)}
+                </div>
+            `;
+        } else {
+            summaryDiv.innerHTML = "Set a budget above to see monthly progress.";
+        }
+
 
         // --- STEP 2: RENDER GRID ---
 
