@@ -431,43 +431,54 @@
     </div>
 </div>
 <div class="modal" id="helpModal">
-    <div class="modal-content" style="max-width:550px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h2 style="margin:0; color:var(--primary);">Welcome to PaceBudget</h2>
+    <div class="modal-content" style="max-width:600px; max-height:90vh;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:15px; margin-bottom:15px;">
+            <h2 style="margin:0; font-size:1.3rem;">How PaceBudget Works</h2>
             <button class="btn-text" onclick="closeHelp()" style="font-size:1.5rem; line-height:1;">&times;</button>
         </div>
         
-        <div style="line-height:1.6; color:var(--text-main); font-size:0.95rem;">
-            <p><strong>Most budgeting apps fail because they ignore time.</strong> They tell you that you have $500 for groceries, but they don't warn you that spending $200 today will cause you to bounce a check next week.</p>
+        <div style="line-height:1.5; color:var(--text-main); font-size:0.9rem; overflow-y:auto;">
             
-            <h4 style="margin:15px 0 5px 0;">🚀 The "Pace" Philosophy</h4>
-            <p style="margin-top:0;">
-                PaceBudget treats your monthly income as a <strong>daily wage</strong>. If your budget is $3,000/month, you "earn" $100 every day.
+            <h4 style="margin:0 0 5px 0; color:var(--primary);">1. The Goal: Fixing "Front-Loading"</h4>
+            <p style="margin-top:0; color:var(--text-sub);">
+                The primary cause of budget failure is "front-loading": seeing a full bank account at the start of the month, feeling wealthy, and overspending immediately. This leaves you with zero (or negative) funds for the final week of the month.
+            </p>
+            <p style="color:var(--text-sub);">
+                PaceBudget solves this by treating your monthly budget as a <strong>daily wage</strong>. If your budget is $300, you do not have $300 today. You have $10 today, another $10 tomorrow, etc. You must wait to "accrue" the funds before spending them.
             </p>
 
-            <h4 style="margin:15px 0 5px 0;">🔮 The Crystal Ball (Look-Ahead)</h4>
-            <p style="margin-top:0;">
-                The balance you see on the calendar is your <strong>"True Safe Cash."</strong> 
+            <h4 style="margin:20px 0 5px 0; color:var(--primary);">2. Intended Use: Discretionary Spending Only</h4>
+            <p style="margin-top:0; color:var(--text-sub);">
+                <strong>Do not include fixed bills like Rent, Mortgage, or Insurance here.</strong>
+            </p>
+            <p style="color:var(--text-sub);">
+                This tool is intended for <strong>elastic (variable) expenses</strong>—things you have control over, like dining out, hobbies, groceries, or gadgets. 
                 <br><br>
-                <em>Example:</em> You have $100 today. But you have a $90 bill due in 3 days. 
-                Standard apps say you have $100. PaceBudget says you have <strong>$10</strong>. 
-                It automatically reserves money for future bills so you never accidentally overspend.
+                <em>To use correctly:</em> Take your Total Income, subtract your Fixed Bills, and enter the <strong>remaining amount</strong> as your Budget at the top of the screen.
             </p>
 
-            <h4 style="margin:15px 0 5px 0;">🛠 How to use it</h4>
-            <ul style="padding-left:20px; margin-top:5px;">
-                <li><strong>Step 1:</strong> Set your total Monthly Budget at the top.</li>
-                <li><strong>Step 2:</strong> Add your fixed bills (Rent, Internet) on their due dates.</li>
-                <li><strong>Step 3:</strong> Check the <strong>Green Number</strong> on "Today." That is exactly how much you can spend on coffee, lunch, or fun without breaking your future plans.</li>
+            <h4 style="margin:20px 0 5px 0; color:var(--primary);">3. The "Look-Ahead" Balance</h4>
+            <p style="margin-top:0; color:var(--text-sub);">
+                The dollar amount shown on a specific day is not just the cash available that day. It is your <strong>Safe-to-Spend Balance</strong>.
+            </p>
+            <p style="color:var(--text-sub); background:#f8fafc; padding:10px; border-left:3px solid #cbd5e1;">
+                <strong>The Logic:</strong> If you have $50 today, but you have a scheduled expense of $45 scheduled for tomorrow, the calendar will show you have only <strong>$5</strong> available today. The system automatically reserves money for future plans to prevent you from accidentally "stealing" from your future self.
+            </p>
+
+            <h4 style="margin:20px 0 5px 0; color:var(--primary);">4. Smart Scheduling & The Queue</h4>
+            <p style="margin-top:0; color:var(--text-sub);">
+                Because the system knows your daily accrual rate, it can mathematically determine the earliest date you can afford an item without going into the red.
+            </p>
+            <ul style="margin-top:5px; padding-left:20px; color:var(--text-sub);">
+                <li style="margin-bottom:5px;"><strong>Unscheduled Expenses:</strong> Items you want to buy but haven't assigned a date to.</li>
+                <li style="margin-bottom:5px;"><strong>The Queue:</strong> A list of all planned spending. You can reorder them by priority.</li>
+                <li><strong>Auto-Schedule:</strong> The algorithm places your high-priority items on the earliest possible dates where they won't break your budget, pushing lower-priority items to later dates (or next month) automatically.</li>
             </ul>
 
-            <div style="background:#eff6ff; padding:15px; border-radius:8px; margin-top:15px; border-left:4px solid var(--primary);">
-                <strong>Pro Tip:</strong> Use the <em>Plan Queue</em>! Dump all your upcoming expenses into the list, and hit <strong>Auto-Schedule</strong>. The AI will find the perfect days to pay them without ever letting your balance go red.
-            </div>
         </div>
         
-        <div style="margin-top:20px; text-align:center;">
-            <button class="btn-outline" onclick="closeHelp()">Got it!</button>
+        <div style="margin-top:20px; text-align:right; border-top:1px solid #eee; padding-top:15px;">
+            <button class="btn-outline" onclick="closeHelp()">Close</button>
         </div>
     </div>
 </div>
