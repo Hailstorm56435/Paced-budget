@@ -35,7 +35,13 @@
             display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
         }
 
-        #userDisplay { display: none; align-items: center; gap: 10px; font-size: 0.9rem; }
+        .profile-btn {
+            background: #e2e8f0; color: var(--text-main); 
+            width: 40px; height: 40px; border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; cursor: pointer; border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
 
         .controls {
             background: var(--surface); padding: 15px; border-radius: 12px;
@@ -189,7 +195,7 @@
             .schedule-row { justify-content: center; margin-top: 5px; }
         }
 
-        /* --- MODAL --- */
+        /* --- MODALS --- */
         .modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 2000;
@@ -198,7 +204,8 @@
         .modal.active { display: flex; }
         .modal-content {
             background: white; padding: 25px; border-radius: 16px;
-            width: 90%; max-width: 400px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            width: 90%; max-width: 450px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            max-height: 85vh; overflow-y: auto; display: flex; flex-direction: column;
         }
 
         .expense-list-item {
@@ -212,6 +219,20 @@
             display: flex; justify-content: space-between; align-items: center;
             padding: 8px; border-bottom: 1px solid #eee; font-size: 0.9rem;
         }
+
+        /* Queue List Styling */
+        .queue-item {
+            display: flex; gap: 10px; align-items: center; background: #fff; border: 1px solid #e2e8f0;
+            margin-bottom: 8px; padding: 10px; border-radius: 8px;
+        }
+        .queue-details { flex-grow: 1; }
+        .queue-cost { font-weight: bold; }
+        .queue-controls { display: flex; flex-direction: column; gap: 2px; }
+        .queue-arrow { 
+            border: 1px solid #ddd; background: #f8fafc; width: 24px; height: 24px; 
+            display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 4px;
+        }
+        .queue-arrow:hover { background: #e2e8f0; }
 
         /* --- LOGIN --- */
         #loginPrompt {
@@ -233,9 +254,8 @@
 <div class="container">
     <header>
         <h1 style="margin:0; font-size:1.2rem; font-weight:800; color:var(--primary);">PaceBudget</h1>
-        <div id="userDisplay">
-            <span id="userEmail" style="color:var(--text-sub);"></span>
-            <button class="btn-text" onclick="logout()">Sign Out</button>
+        <div id="userDisplay" style="display:none;">
+            <div class="profile-btn" onclick="openSettings()">👤</div>
         </div>
     </header>
 
@@ -263,16 +283,18 @@
             </div>
             
             <div class="budget-row">
-                <span style="flex-grow:1;">Monthly Budget:</span>
+                <span style="flex-grow:1;">Daily Budget:</span>
                 <input type="number" id="budgetInput" onchange="updateBudget()" placeholder="0" style="width:100px; text-align:right;">
             </div>
 
             <div class="top-actions">
                 <button class="btn-outline" onclick="toggleInbox()" id="inboxBtn">
-                    <span>📂 Unscheduled Expenses</span>
+                    <span>📂 Inbox</span>
                     <span id="inboxCount" style="background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">0</span>
                 </button>
-                <button class="btn-text" style="font-size:1.2rem;" onclick="openSettings()">⚙️</button>
+                <button class="btn-outline" onclick="openQueueModal()">
+                    <span>📋 Plan Queue</span>
+                </button>
             </div>
         </div>
 
@@ -289,7 +311,7 @@
 
                 <div class="link-row">
                     <input type="url" id="pendingLink" class="link-input" placeholder="Paste Item Link (optional)">
-                    <button type="button" id="addPendingBtn" onclick="addPendingItem()">Add to List</button>
+                    <button type="button" id="addPendingBtn" onclick="addPendingItem()">Add to Inbox</button>
                     <button type="button" id="cancelPendingEditBtn" class="btn-text" onclick="cancelPendingEdit()" style="display:none;">Cancel</button>
                 </div>
             </div>
@@ -310,53 +332,83 @@
 
 <div class="modal" id="expenseModal">
     <div class="modal-content">
-        <h3 id="modalTitle" style="margin-top:0;">Add Expense</h3>
+        <h3 id="modalTitle" style="margin-top:0;">Edit Day</h3>
         <p style="font-size:0.8rem; color:#666; margin-top:-10px;">Click an item below to edit it.</p>
         
         <div id="existingExpensesList" style="margin-bottom:15px; max-height:150px; overflow-y:auto; background:#f8fafc; border-radius:8px;"></div>
         
-        <div style="margin-bottom:5px;">
-            <label style="font-size:0.8rem; color:var(--text-sub);">Amount</label>
-            <input type="number" id="expenseAmount" step="0.01" placeholder="0.00" style="width:100%; font-size:1.2rem; padding:12px;">
-        </div>
-        <label class="checkbox-wrapper" style="margin-bottom:10px;">
-            <input type="checkbox" id="expenseTax"> Include 10% Sales Tax
-        </label>
-        
-        <div style="margin-bottom:10px;">
-            <label style="font-size:0.8rem; color:var(--text-sub);">Description</label>
-            <input type="text" id="expenseDesc" placeholder="e.g. Lunch">
-        </div>
+        <div style="border-top:1px solid #eee; padding-top:15px;">
+            <h4 style="margin:0 0 10px 0;">Add New to this Day</h4>
+            <div style="margin-bottom:5px;">
+                <label style="font-size:0.8rem; color:var(--text-sub);">Amount</label>
+                <input type="number" id="expenseAmount" step="0.01" placeholder="0.00" style="width:100%; font-size:1.2rem; padding:12px;">
+            </div>
+            <label class="checkbox-wrapper" style="margin-bottom:10px;">
+                <input type="checkbox" id="expenseTax"> Include 10% Sales Tax
+            </label>
+            
+            <div style="margin-bottom:10px;">
+                <label style="font-size:0.8rem; color:var(--text-sub);">Description</label>
+                <input type="text" id="expenseDesc" placeholder="e.g. Lunch">
+            </div>
 
-        <div style="margin-bottom:20px;">
-            <label style="font-size:0.8rem; color:var(--text-sub);">Item Link (Optional)</label>
-            <input type="url" id="expenseLink" placeholder="https://..." class="link-input">
-        </div>
-        
-        <div style="display:flex; justify-content:space-between;">
-            <button type="button" class="btn-text" onclick="closeModal()">Close</button>
-            <button type="button" id="modalSaveBtn" onclick="saveExpense()">Save Item</button>
+            <div style="margin-bottom:20px;">
+                <label style="font-size:0.8rem; color:var(--text-sub);">Item Link (Optional)</label>
+                <input type="url" id="expenseLink" placeholder="https://..." class="link-input">
+            </div>
+            
+            <div style="display:flex; justify-content:space-between;">
+                <button type="button" class="btn-text" onclick="closeModal()">Close</button>
+                <button type="button" id="modalSaveBtn" onclick="saveExpense()">Save Item</button>
+            </div>
         </div>
     </div>
 </div>
 
 <div class="modal" id="settingsModal">
     <div class="modal-content">
-        <h3 style="margin-top:0;">⚙️ Settings</h3>
-        <h4 style="margin-bottom:5px;">Email Notifications</h4>
-        <p style="font-size:0.8rem; color:var(--text-sub); margin-top:0;">
-            Add email addresses to be notified when items are scheduled for purchase.
-        </p>
-
-        <div style="display:flex; gap:5px; margin-bottom:10px;">
-            <input type="email" id="newEmailInput" placeholder="family@email.com">
-            <button onclick="addNewEmail()">Add</button>
+        <h3 style="margin-top:0;">⚙️ Profile & Settings</h3>
+        
+        <div style="margin-bottom:20px;">
+            <label style="font-size:0.8rem; color:var(--text-sub);">Account Name</label>
+            <input type="text" id="userNameInput" placeholder="Family Name" onchange="saveUserName()">
         </div>
 
-        <div id="emailListContainer" style="margin-bottom:20px; max-height:150px; overflow-y:auto; border:1px solid var(--border); border-radius:8px;"></div>
+        <div style="margin-bottom:20px; border-top:1px solid #eee; padding-top:15px;">
+            <h4 style="margin:0 0 5px 0;">Email Notifications</h4>
+            <p style="font-size:0.8rem; color:var(--text-sub); background:#eef2ff; padding:10px; border-radius:8px; line-height:1.4;">
+                <strong>Note:</strong> Emails in this list will receive a report of items 
+                scheduled for purchase that specific day. You will receive max one email per day, only if there are active expenses.
+            </p>
+
+            <div style="display:flex; gap:5px; margin-bottom:10px; margin-top:10px;">
+                <input type="email" id="newEmailInput" placeholder="family@email.com">
+                <button onclick="addNewEmail()">Add</button>
+            </div>
+
+            <div id="emailListContainer" style="margin-bottom:20px; max-height:150px; overflow-y:auto; border:1px solid var(--border); border-radius:8px;"></div>
+        </div>
         
-        <div style="text-align:right;">
-            <button class="btn-text" onclick="closeSettings()">Done</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #eee; padding-top:15px;">
+             <button class="btn-text" onclick="logout()" style="color:var(--danger);">Sign Out</button>
+             <button class="btn-outline" onclick="closeSettings()">Done</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="queueModal">
+    <div class="modal-content">
+        <h3 style="margin-top:0;">📋 Upcoming Queue</h3>
+        <p style="font-size:0.85rem; color:var(--text-sub); margin-top:-10px; margin-bottom:15px;">
+            These are all scheduled expenses from today onwards. Reorder them by priority, then click Auto-Schedule to fit them into your daily budget automatically.
+        </p>
+
+        <div id="queueContainer" style="background:#f8fafc; border:1px solid #eee; border-radius:8px; padding:10px; max-height:300px; overflow-y:auto; margin-bottom:15px;">
+            </div>
+        
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            <button class="btn-success" onclick="applySmartSchedule()">✨ Auto-Schedule to Budget</button>
+            <button class="btn-text" onclick="closeQueueModal()">Cancel</button>
         </div>
     </div>
 </div>
@@ -385,7 +437,7 @@
     let unsubscribe = null; 
 
     // Initialize global immediately so UI doesn't crash on load
-    window.appData = { pending: [], emailList: [], budget: 0 };
+    window.appData = { pending: [], emailList: [], budget: 0, displayName: '' };
 
     // --- AUTH ---
     window.handleLogin = (e) => { e.preventDefault(); window.login(); };
@@ -413,7 +465,6 @@
         currentUser = user;
         if (user) {
             document.getElementById('userDisplay').style.display = 'flex';
-            document.getElementById('userEmail').textContent = user.email.split('@')[0];
             document.getElementById('appContent').style.display = 'block';
             document.getElementById('loginPrompt').style.display = 'none';
             startDataListener(user.uid);
@@ -436,7 +487,7 @@
                     document.getElementById('budgetInput').value = window.appData.budget || 0;
                 }
             } else {
-                window.appData = { pending: [], emailList: [], budget: 0 };
+                window.appData = { pending: [], emailList: [], budget: 0, displayName: '' };
             }
             window.refreshUI();
         });
@@ -462,7 +513,6 @@
         return '💸';
     };
     
-    // Auto-fix links
     window.fixLink = (url) => {
         if(!url) return '';
         if(!url.startsWith('http://') && !url.startsWith('https://')) return 'https://' + url;
@@ -476,7 +526,7 @@
             window.renderModalList();
         }
         if(document.getElementById('settingsModal').classList.contains('active')) {
-            window.renderEmailList();
+            window.renderSettings();
         }
     }
 </script>
@@ -489,6 +539,8 @@
     window.showHistory = false;
     window.editingPendingIndex = -1; 
     window.editingExpenseIndex = -1;
+    // Temp storage for the queue tool
+    window.tempQueue = [];
 
     window.getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
 
@@ -505,35 +557,22 @@
     // --- BUDGET & SETTINGS LOGIC ---
     window.updateBudget = () => {
         const val = parseFloat(document.getElementById('budgetInput').value) || 0;
-        window.appData.budget = val; // Save globally so Apps Script can see it
-        // Also save to month key for historical tracking if needed, but global is key for email
+        window.appData.budget = val; 
         window.saveToCloud();
         window.renderCalendar();
     };
 
     window.openSettings = () => {
         document.getElementById('settingsModal').classList.add('active');
-        window.renderEmailList();
+        window.renderSettings();
     };
     window.closeSettings = () => document.getElementById('settingsModal').classList.remove('active');
 
-    window.addNewEmail = () => {
-        const inp = document.getElementById('newEmailInput');
-        const email = inp.value.trim();
-        if(email && email.includes('@')) {
-            if(!window.appData.emailList) window.appData.emailList = [];
-            window.appData.emailList.push(email);
-            window.saveToCloud();
-            inp.value = '';
-            window.renderEmailList();
-        }
-    };
-    window.removeEmail = (idx) => {
-        window.appData.emailList.splice(idx, 1);
-        window.saveToCloud();
-        window.renderEmailList();
-    };
-    window.renderEmailList = () => {
+    window.renderSettings = () => {
+        // Name
+        document.getElementById('userNameInput').value = window.appData.displayName || '';
+        
+        // Emails
         const c = document.getElementById('emailListContainer');
         c.innerHTML = '';
         (window.appData.emailList || []).forEach((email, idx) => {
@@ -543,6 +582,207 @@
             c.appendChild(div);
         });
     };
+
+    window.saveUserName = () => {
+        window.appData.displayName = document.getElementById('userNameInput').value;
+        window.saveToCloud();
+    };
+
+    window.addNewEmail = () => {
+        const inp = document.getElementById('newEmailInput');
+        const email = inp.value.trim();
+        if(email && email.includes('@')) {
+            if(!window.appData.emailList) window.appData.emailList = [];
+            window.appData.emailList.push(email);
+            window.saveToCloud();
+            inp.value = '';
+            window.renderSettings();
+        }
+    };
+    window.removeEmail = (idx) => {
+        window.appData.emailList.splice(idx, 1);
+        window.saveToCloud();
+        window.renderSettings();
+    };
+
+    // --- SMART QUEUE / RESCHEDULER LOGIC ---
+    
+    window.openQueueModal = () => {
+        // 1. Gather all future expenses (Today onwards)
+        window.tempQueue = [];
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        
+        // We need to look through all potential month keys in appData
+        // Simpler approach: iterate existing keys in appData that match format YYYY-MM
+        Object.keys(window.appData).forEach(key => {
+            if(!key.match(/^\d{4}-\d{2}$/)) return;
+            
+            const monthData = window.appData[key];
+            if(!monthData.expenses) return;
+
+            Object.keys(monthData.expenses).forEach(day => {
+                const parts = key.split('-');
+                const itemDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(day));
+                
+                if (itemDate >= today) {
+                    // It's in the future (or today)
+                    monthData.expenses[day].forEach(exp => {
+                        window.tempQueue.push({
+                            ...exp,
+                            originalDate: itemDate // Keep track just in case
+                        });
+                    });
+                }
+            });
+        });
+
+        // 2. Sort initially by date to be helpful
+        window.tempQueue.sort((a,b) => a.originalDate - b.originalDate);
+
+        window.renderQueueList();
+        document.getElementById('queueModal').classList.add('active');
+    };
+
+    window.closeQueueModal = () => {
+        document.getElementById('queueModal').classList.remove('active');
+    };
+
+    window.renderQueueList = () => {
+        const c = document.getElementById('queueContainer');
+        c.innerHTML = '';
+        
+        if (window.tempQueue.length === 0) {
+            c.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No upcoming scheduled expenses found.</div>';
+            return;
+        }
+
+        window.tempQueue.forEach((item, idx) => {
+            const div = document.createElement('div');
+            div.className = 'queue-item';
+            div.innerHTML = `
+                <div class="queue-controls">
+                    <div class="queue-arrow" onclick="moveQueueItem(${idx}, -1)">▲</div>
+                    <div class="queue-arrow" onclick="moveQueueItem(${idx}, 1)">▼</div>
+                </div>
+                <div class="queue-details">
+                    <div>${item.desc}</div>
+                    <div style="font-size:0.75rem; color:#888;">Currently: ${item.originalDate.toLocaleDateString()}</div>
+                </div>
+                <div class="queue-cost">$${item.amount.toFixed(0)}</div>
+            `;
+            c.appendChild(div);
+        });
+    };
+
+    window.moveQueueItem = (idx, dir) => {
+        if (dir === -1 && idx === 0) return;
+        if (dir === 1 && idx === window.tempQueue.length - 1) return;
+        
+        // Swap
+        const temp = window.tempQueue[idx];
+        window.tempQueue[idx] = window.tempQueue[idx + dir];
+        window.tempQueue[idx + dir] = temp;
+        
+        window.renderQueueList();
+    };
+
+    window.applySmartSchedule = () => {
+        if(!confirm("This will reschedule all upcoming expenses based on your new order to fit the daily budget. Proceed?")) return;
+
+        const budget = window.appData.budget;
+        if (!budget || budget <= 0) {
+            alert("Please set a daily budget first.");
+            return;
+        }
+
+        // 1. CLEAR existing future expenses from appData
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        
+        Object.keys(window.appData).forEach(key => {
+            if(!key.match(/^\d{4}-\d{2}$/)) return;
+            const monthData = window.appData[key];
+            if(!monthData.expenses) return;
+
+            Object.keys(monthData.expenses).forEach(day => {
+                const parts = key.split('-');
+                const itemDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(day));
+                if (itemDate >= today) {
+                    delete monthData.expenses[day]; // Clear the day
+                }
+            });
+        });
+
+        // 2. Re-insert items based on budget logic
+        let scheduleDate = new Date(today); // Start checking from Today
+        
+        window.tempQueue.forEach(item => {
+            let placed = false;
+            let safety = 0;
+
+            // Find first day where (CurrentTotal + ItemAmount <= Budget)
+            while (!placed && safety < 365) {
+                // Get current total for scheduleDate
+                const mKey = window.getMonthKey(scheduleDate);
+                const dKey = scheduleDate.getDate();
+                
+                // Ensure structure exists
+                if(!window.appData[mKey]) window.appData[mKey] = { expenses: {} };
+                if(!window.appData[mKey].expenses) window.appData[mKey].expenses = {};
+                const currentExpenses = window.appData[mKey].expenses[dKey] || [];
+                
+                const currentTotal = currentExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+                if (currentTotal + item.amount <= budget) {
+                    // Fits!
+                    if(!window.appData[mKey].expenses[dKey]) window.appData[mKey].expenses[dKey] = [];
+                    // Clean item (remove originalDate temp prop)
+                    const cleanItem = {
+                        amount: item.amount,
+                        desc: item.desc,
+                        link: item.link || '',
+                        icon: item.icon || '💸',
+                        addedAt: new Date().toISOString()
+                    };
+                    window.appData[mKey].expenses[dKey].push(cleanItem);
+                    placed = true;
+                    // Important: We do NOT increment scheduleDate here. 
+                    // We want to pack the day as full as possible with subsequent items.
+                } else {
+                    // Full, move to next day
+                    scheduleDate.setDate(scheduleDate.getDate() + 1);
+                }
+                safety++;
+            }
+            
+            if(!placed) {
+                // Logic for item > daily budget? 
+                // For now, force it onto the last checked day (next available empty day basically)
+                // This prevents infinite loops if an item is $500 and budget is $400.
+                const mKey = window.getMonthKey(scheduleDate);
+                const dKey = scheduleDate.getDate();
+                 if(!window.appData[mKey]) window.appData[mKey] = { expenses: {} };
+                 if(!window.appData[mKey].expenses) window.appData[mKey].expenses = {};
+                 if(!window.appData[mKey].expenses[dKey]) window.appData[mKey].expenses[dKey] = [];
+                 
+                 const cleanItem = {
+                    amount: item.amount,
+                    desc: item.desc,
+                    link: item.link || '',
+                    icon: item.icon || '💸',
+                    addedAt: new Date().toISOString()
+                };
+                 window.appData[mKey].expenses[dKey].push(cleanItem);
+                 scheduleDate.setDate(scheduleDate.getDate() + 1); // Move to next day for next item
+            }
+        });
+
+        window.saveToCloud();
+        window.closeQueueModal();
+        window.renderCalendar();
+    };
+
 
     // --- INBOX LOGIC ---
     window.toggleInbox = () => {
@@ -579,7 +819,7 @@
         if (window.editingPendingIndex > -1) {
             window.appData.pending[window.editingPendingIndex] = newItem;
             window.editingPendingIndex = -1;
-            document.getElementById('addPendingBtn').textContent = "Add to List";
+            document.getElementById('addPendingBtn').textContent = "Add to Inbox";
             document.getElementById('cancelPendingEditBtn').style.display = 'none';
         } else {
             window.appData.pending.push(newItem);
@@ -609,7 +849,7 @@
         document.getElementById('pendingAmount').value = '';
         document.getElementById('pendingDesc').value = '';
         document.getElementById('pendingLink').value = '';
-        document.getElementById('addPendingBtn').textContent = "Add to List";
+        document.getElementById('addPendingBtn').textContent = "Add to Inbox";
         document.getElementById('cancelPendingEditBtn').style.display = 'none';
         window.renderPendingList();
     };
@@ -621,7 +861,7 @@
         
         list.innerHTML = '';
         if(count === 0) {
-            list.innerHTML = '<div style="padding:15px; text-align:center; color:var(--text-sub); font-size:0.9rem;">Queue is empty.<br>Add unscheduled expenses above.</div>';
+            list.innerHTML = '<div style="padding:15px; text-align:center; color:var(--text-sub); font-size:0.9rem;">Inbox is empty.<br>Add unscheduled expenses above.</div>';
             return;
         }
 
@@ -688,201 +928,184 @@
         if (!window.appData[monthKey].expenses) window.appData[monthKey].expenses = {};
         if (!window.appData[monthKey].expenses[day]) window.appData[monthKey].expenses[day] = [];
         
-        window.appData[monthKey].expenses[day].push({
-            amount: item.amount,
-            desc: item.desc,
-            link: item.link || '',
-            icon: item.icon
-        });
-        
+        window.appData[monthKey].expenses[day].push(item);
         window.appData.pending.splice(idx, 1);
-        window.saveToCloud();
         
-        if (targetDate.getMonth() === window.currentDate.getMonth()) {
-            window.renderCalendar();
-        } else {
-            window.currentDate = targetDate;
-            window.renderCalendar();
-        }
-    }
+        window.saveToCloud();
+        window.renderCalendar();
+        window.renderPendingList();
+    };
 
-    window.findNextAffordableDate = function(amount) {
-        let checkDate = new Date();
-        checkDate.setHours(0,0,0,0);
-        const currentBud = parseFloat(document.getElementById('budgetInput').value) || 0;
-        if(currentBud <= 0) return null;
+    window.findNextAffordableDate = (amount) => {
+        const dailyLimit = window.appData.budget || 0;
+        if (dailyLimit <= 0) return null;
+        if (amount > dailyLimit) return null; 
 
-        const maxChecks = 45;
-        let checks = 0;
-
-        while (checks < maxChecks) {
-            const monthKey = window.getMonthKey(checkDate);
-            // Use global budget logic
-            const day = checkDate.getDate();
-            const daysInMonth = new Date(checkDate.getFullYear(), checkDate.getMonth() + 1, 0).getDate();
-            const dailyPace = currentBud / daysInMonth;
+        const today = new Date();
+        // Check next 60 days
+        for(let i=0; i<60; i++) {
+            const checkDate = new Date();
+            checkDate.setDate(today.getDate() + i);
             
-            let spent = 0;
-            if (window.appData[monthKey] && window.appData[monthKey].expenses) {
-                for (let d = 1; d <= day; d++) {
-                    const dayEx = window.appData[monthKey].expenses[d] || [];
-                    spent += dayEx.reduce((sum, e) => sum + e.amount, 0);
-                }
+            const mKey = window.getMonthKey(checkDate);
+            const dKey = checkDate.getDate();
+            
+            let dayTotal = 0;
+            if (window.appData[mKey] && window.appData[mKey].expenses && window.appData[mKey].expenses[dKey]) {
+                dayTotal = window.appData[mKey].expenses[dKey].reduce((sum, item) => sum + item.amount, 0);
             }
-
-            const bal = (dailyPace * day) - spent;
-            if (bal >= amount) return new Date(checkDate);
-            checkDate.setDate(checkDate.getDate() + 1);
-            checks++;
+            
+            if (dayTotal + amount <= dailyLimit) {
+                return checkDate;
+            }
         }
         return null;
-    }
+    };
 
-    // --- CALENDAR RENDERER ---
+    // --- CALENDAR RENDER ---
     window.renderCalendar = () => {
         const grid = document.getElementById('calendarGrid');
         grid.innerHTML = '';
         
-        const year = window.currentDate.getFullYear();
-        const month = window.currentDate.getMonth();
-        const monthKey = window.getMonthKey(window.currentDate);
-        const todayDate = new Date();
-        const isCurrentMonth = (todayDate.getMonth() === month && todayDate.getFullYear() === year);
-
+        const y = window.currentDate.getFullYear();
+        const m = window.currentDate.getMonth();
+        
         document.getElementById('currentMonthLabel').textContent = window.currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+        const firstDayOfMonth = new Date(y, m, 1).getDay();
+        const daysInMonth = new Date(y, m + 1, 0).getDate();
         
-        const historyContainer = document.getElementById('historyToggleContainer');
-        const historyBtn = document.getElementById('historyBtn');
-        
-        if (isCurrentMonth && todayDate.getDate() > 1) {
-            historyContainer.style.display = 'block';
-            historyBtn.textContent = window.showHistory ? "Hide previous days" : `Show previous ${todayDate.getDate() - 1} days`;
-        } else {
-            historyContainer.style.display = 'none';
+        const today = new Date();
+        const isCurrentMonth = (today.getFullYear() === y && today.getMonth() === m);
+
+        // Blank start days
+        for(let i=0; i<firstDayOfMonth; i++) {
+            const d = document.createElement('div');
+            d.className = 'day-cell empty';
+            grid.appendChild(d);
         }
 
-        // Budget Calculation
-        const totalBudget = window.appData.budget || 0;
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const dailyPace = totalBudget > 0 ? totalBudget / daysInMonth : 0;
-        let runningSpent = 0;
+        const monthKey = window.getMonthKey(window.currentDate);
+        const expensesMap = (window.appData[monthKey] && window.appData[monthKey].expenses) ? window.appData[monthKey].expenses : {};
 
-        // Days loop
-        const firstDayIndex = new Date(year, month, 1).getDay();
-        
-        // Empty cells for desktop
-        if(window.innerWidth > 600) {
-            for (let i = 0; i < firstDayIndex; i++) {
-                const empty = document.createElement('div');
-                empty.className = 'day-cell empty';
-                grid.appendChild(empty);
-            }
-        }
-
-        for (let d = 1; d <= daysInMonth; d++) {
-            const isToday = isCurrentMonth && d === todayDate.getDate();
-            const isPast = isCurrentMonth && d < todayDate.getDate();
-
-            if (isPast && !window.showHistory) continue;
-
-            const dayExpenses = (window.appData[monthKey] && window.appData[monthKey].expenses && window.appData[monthKey].expenses[d]) 
-                ? window.appData[monthKey].expenses[d] 
-                : [];
-
-            const dayTotal = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
-            runningSpent += dayTotal;
+        for(let day=1; day<=daysInMonth; day++) {
+            const dateObj = new Date(y, m, day);
             
-            const targetBalance = dailyPace * d;
-            const actualBalance = targetBalance - runningSpent;
+            // Hide History Check
+            if(!window.showHistory && isCurrentMonth && day < today.getDate()) {
+                document.getElementById('historyToggleContainer').style.display = 'block';
+                // Render placeholder but hidden on grid, OR just greyed out. 
+                // To keep grid aligned, we must render, but maybe class 'past-day'
+            }
+
+            // Mobile view: hide past days completely if history hidden
+            const isPast = (dateObj < new Date(today.setHours(0,0,0,0)));
+            if (!window.showHistory && isPast) {
+               // On desktop grid, we need placeholders. On mobile flex, we can hide.
+               // For simplicity, we render but can style them.
+            }
 
             const cell = document.createElement('div');
-            cell.className = `day-cell ${isToday ? 'today' : ''}`;
-            cell.onclick = () => window.openModal(d);
+            cell.className = 'day-cell';
+            if(isCurrentMonth && day === today.getDate()) cell.classList.add('today');
+            
+            if(!window.showHistory && isPast) {
+                cell.style.opacity = '0.3';
+                cell.style.background = '#f1f5f9';
+            }
 
-            const date = new Date(year, month, d);
-            const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
+            const dayExpenses = expensesMap[day] || [];
+            const dayTotal = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
+            const budget = window.appData.budget || 0;
+            const balance = budget - dayTotal;
+
+            const dayName = dateObj.toLocaleDateString('en-US', {weekday:'short'});
 
             let chipsHtml = '';
             dayExpenses.forEach(exp => {
-                const linkIcon = exp.link ? '🔗' : '';
-                chipsHtml += `<div class="expense-chip">${exp.icon} ${exp.desc} ${linkIcon} -$${exp.amount.toFixed(0)}</div>`;
+                chipsHtml += `<div class="expense-chip" title="${exp.desc}">
+                    ${exp.icon || '💸'} $${exp.amount.toFixed(0)}
+                </div>`;
             });
+
+            const balClass = balance >= 0 ? 'bal-pos' : 'bal-neg';
 
             cell.innerHTML = `
                 <div class="date-number">
-                    <span>${d}</span>
-                    <span class="day-weekday">${weekday}</span>
+                    <span>${day}</span>
+                    <span class="day-weekday">${dayName}</span>
                 </div>
                 <div class="expense-chips">${chipsHtml}</div>
-                <div class="balance-indicator ${actualBalance >= 0 ? 'bal-pos' : 'bal-neg'}">
-                    ${actualBalance >= 0 ? '+' : ''}$${actualBalance.toFixed(0)}
-                </div>
+                <div class="balance-indicator ${balClass}">$${balance.toFixed(0)}</div>
             `;
+            
+            cell.onclick = () => window.openModal(day, dayExpenses);
             grid.appendChild(cell);
         }
     };
 
-    // --- EXPENSE MODAL ---
-    window.openModal = (day) => {
+    // --- MODAL LOGIC (Edit Day) ---
+    window.openModal = (day, expenses) => {
         window.selectedDate = new Date(window.currentDate.getFullYear(), window.currentDate.getMonth(), day);
-        document.getElementById('modalTitle').textContent = `Expenses for ${window.selectedDate.toLocaleDateString()}`;
+        window.editingExpenseIndex = -1;
+        document.getElementById('modalTitle').textContent = `Edit ${window.selectedDate.toLocaleDateString('en-US', {month:'short', day:'numeric'})}`;
         document.getElementById('expenseModal').classList.add('active');
         
-        // Reset Inputs
+        // Clear input fields
         document.getElementById('expenseAmount').value = '';
         document.getElementById('expenseDesc').value = '';
         document.getElementById('expenseLink').value = '';
         document.getElementById('expenseTax').checked = false;
         document.getElementById('modalSaveBtn').textContent = "Save Item";
-        window.editingExpenseIndex = -1;
-        
+
         window.renderModalList();
     };
 
-    window.closeModal = () => document.getElementById('expenseModal').classList.remove('active');
-
     window.renderModalList = () => {
         const list = document.getElementById('existingExpensesList');
-        list.innerHTML = '';
-        
         const monthKey = window.getMonthKey(window.selectedDate);
         const day = window.selectedDate.getDate();
-        const expenses = (window.appData[monthKey]?.expenses?.[day]) || [];
-
+        const expenses = (window.appData[monthKey] && window.appData[monthKey].expenses && window.appData[monthKey].expenses[day]) 
+                         ? window.appData[monthKey].expenses[day] : [];
+        
+        list.innerHTML = '';
         if(expenses.length === 0) {
-            list.innerHTML = '<div style="padding:10px; text-align:center; color:#999; font-size:0.8rem;">No expenses this day.</div>';
-            return;
+            list.innerHTML = '<div style="padding:10px; color:#999; text-align:center; font-size:0.8rem;">No items yet.</div>';
         }
-
+        
         expenses.forEach((item, idx) => {
             const div = document.createElement('div');
             div.className = 'expense-list-item';
             if(idx === window.editingExpenseIndex) div.classList.add('editing');
-            
+
+            let linkHtml = item.link ? `<a href="${item.link}" target="_blank" onclick="event.stopPropagation()">🔗</a>` : '';
+
             div.innerHTML = `
-                <div>${item.icon} ${item.desc} <b>$${item.amount.toFixed(2)}</b></div>
-                <button class="btn-text" style="color:red" onclick="deleteExpense(event, ${idx})">×</button>
+                <div>
+                    <div style="font-weight:600;">$${item.amount.toFixed(2)}</div>
+                    <div style="font-size:0.85rem; color:#666;">${item.icon||''} ${item.desc} ${linkHtml}</div>
+                </div>
+                <div>
+                    <button class="btn-text" onclick="prepareEditExpense(${idx})">✎</button>
+                    <button class="btn-text" style="color:var(--danger);" onclick="deleteExpense(${idx})">×</button>
+                </div>
             `;
-            div.onclick = (e) => {
-                if(e.target.tagName === 'BUTTON') return;
-                window.loadExpenseForEdit(idx);
-            };
             list.appendChild(div);
         });
     };
 
-    window.loadExpenseForEdit = (idx) => {
+    window.prepareEditExpense = (idx) => {
         const monthKey = window.getMonthKey(window.selectedDate);
         const day = window.selectedDate.getDate();
         const item = window.appData[monthKey].expenses[day][idx];
-
+        
         document.getElementById('expenseAmount').value = item.amount;
         document.getElementById('expenseDesc').value = item.desc;
         document.getElementById('expenseLink').value = item.link || '';
         document.getElementById('expenseTax').checked = false;
+        document.getElementById('modalSaveBtn').textContent = "Update Item";
         
         window.editingExpenseIndex = idx;
-        document.getElementById('modalSaveBtn').textContent = "Update Item";
         window.renderModalList();
     };
 
@@ -893,59 +1116,72 @@
         const taxInput = document.getElementById('expenseTax');
 
         let amt = parseFloat(amtInput.value);
-        if (isNaN(amt) || amt <= 0) return;
+        const desc = descInput.value || 'Item';
+        const link = window.fixLink(linkInput.value);
+
+        if(isNaN(amt) || amt <= 0) return;
 
         if(taxInput.checked) {
             amt = amt * 1.1;
             amt = Math.round(amt * 100) / 100;
         }
 
-        const desc = descInput.value || 'Item';
-        const link = window.fixLink(linkInput.value);
-        const newItem = { 
-            amount: amt, 
-            desc: desc, 
-            link: link, 
-            icon: window.getSmartIcon(desc) 
+        const newItem = {
+            amount: amt,
+            desc: desc,
+            link: link,
+            icon: window.getSmartIcon(desc),
+            addedAt: new Date().toISOString()
         };
 
         const monthKey = window.getMonthKey(window.selectedDate);
         const day = window.selectedDate.getDate();
 
-        if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
-        if (!window.appData[monthKey].expenses) window.appData[monthKey].expenses = {};
-        if (!window.appData[monthKey].expenses[day]) window.appData[monthKey].expenses[day] = [];
+        if(!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
+        if(!window.appData[monthKey].expenses) window.appData[monthKey].expenses = {};
+        if(!window.appData[monthKey].expenses[day]) window.appData[monthKey].expenses[day] = [];
 
-        if (window.editingExpenseIndex > -1) {
+        if(window.editingExpenseIndex > -1) {
             window.appData[monthKey].expenses[day][window.editingExpenseIndex] = newItem;
+            window.editingExpenseIndex = -1;
         } else {
             window.appData[monthKey].expenses[day].push(newItem);
         }
 
         window.saveToCloud();
-        window.closeModal();
+        
+        // Reset inputs but keep modal open
+        amtInput.value = ''; descInput.value = ''; linkInput.value = '';
+        taxInput.checked = false;
+        document.getElementById('modalSaveBtn').textContent = "Save Item";
+        
+        window.renderModalList();
         window.renderCalendar();
     };
 
-    window.deleteExpense = (e, idx) => {
-        e.stopPropagation();
-        if(confirm("Remove this item?")) {
-            const monthKey = window.getMonthKey(window.selectedDate);
-            const day = window.selectedDate.getDate();
-            window.appData[monthKey].expenses[day].splice(idx, 1);
-            window.saveToCloud();
-            
-            if(window.editingExpenseIndex === idx) {
-                // Reset edit mode if we deleted the item being edited
-                window.editingExpenseIndex = -1;
-                document.getElementById('modalSaveBtn').textContent = "Save Item";
-                document.getElementById('expenseAmount').value = '';
-                document.getElementById('expenseDesc').value = '';
-            }
-            window.renderModalList();
-            window.renderCalendar();
+    window.deleteExpense = (idx) => {
+        if(!confirm("Remove this item?")) return;
+        
+        const monthKey = window.getMonthKey(window.selectedDate);
+        const day = window.selectedDate.getDate();
+        
+        window.appData[monthKey].expenses[day].splice(idx, 1);
+        window.saveToCloud();
+        
+        if(idx === window.editingExpenseIndex) {
+            window.editingExpenseIndex = -1;
+            document.getElementById('modalSaveBtn').textContent = "Save Item";
+            document.getElementById('expenseAmount').value = '';
         }
+        
+        window.renderModalList();
+        window.renderCalendar();
     };
+
+    window.closeModal = () => {
+        document.getElementById('expenseModal').classList.remove('active');
+    };
+
 </script>
 </body>
 </html>
