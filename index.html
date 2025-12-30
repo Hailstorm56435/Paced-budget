@@ -106,9 +106,6 @@
             font-size: 0.8rem; padding: 5px 10px; border: 1px solid var(--border);
         }
 
-        /* SVG Icon styling */
-        .icon-svg { width: 18px; height: 18px; fill: currentColor; }
-
         input[type="text"], input[type="number"], input[type="email"], input[type="password"], input[type="url"], input[type="date"] {
             padding: 10px; border: 1px solid var(--border); border-radius: 8px;
             font-size: 1rem; background: #fff; width: 100%;
@@ -194,7 +191,7 @@
         .expense-chip { 
             font-size: 0.75rem; color: var(--text-sub); 
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
-            display: block; /* Changed from flex to block to allow simple text truncation */
+            display: block; 
             background: #f1f5f9; padding: 2px 6px; border-radius: 4px;
         }
         .chip-desc-text { opacity: 0.7; margin-left: 4px; font-weight: normal; }
@@ -1030,6 +1027,7 @@
             dateCursor = new Date(today);
 
             while (!placed && safety < 365) {
+                // IMPORTANT: Pass ignore set to isSafeToSpend
                 const safe = window.isSafeToSpend(item.amount, dateCursor, simulatedExpenses, ignoredSignatureSet);
                 if (safe) {
                     item._projectedDate = new Date(dateCursor); 
@@ -1154,23 +1152,27 @@
 
         const dailyExpenses = new Array(daysInMonth + 1).fill(0);
 
-        // 1. Load Existing Calendar Items (Skipping ignored ones)
+        // 1. Load Existing Calendar Items
+        // Past Items are ALWAYS loaded.
+        // Future Items are loaded ONLY if they are NOT in the ignored set (being moved)
         if(window.appData[mKey] && window.appData[mKey].expenses) {
             Object.keys(window.appData[mKey].expenses).forEach(dStr => {
                 const day = parseInt(dStr);
                 const itemDate = new Date(y, m, day);
                 
-                // Only look at dates from today onwards for conflicts?
-                // Actually we need to load ALL history to get the balance right.
-                // But we only IGNORE items if they are >= today (since queue only pulls >= today)
-                
                 window.appData[mKey].expenses[dStr].forEach((e, idx) => {
-                    // Check Ignore List
-                    if(ignoredSignatureSet) {
-                        const sig = `${itemDate.getTime()}-${idx}`;
-                        if(ignoredSignatureSet.has(sig)) return; // Skip this item, it's being moved
+                    // If it is in the past, always include (consumed budget)
+                    if (itemDate < today) {
+                        dailyExpenses[day] += e.amount;
+                    } else {
+                        // If it is in the future, check if it's being moved
+                        if(ignoredSignatureSet) {
+                            const sig = `${itemDate.getTime()}-${idx}`;
+                            if(ignoredSignatureSet.has(sig)) return; // Skip, it is in queue
+                        }
+                        // Otherwise, it is a fixed wall
+                        dailyExpenses[day] += e.amount;
                     }
-                    dailyExpenses[day] += e.amount;
                 });
             });
         }
@@ -1207,7 +1209,6 @@
             today.setHours(0,0,0,0);
 
             // 1. Remove used items from their Original Locations
-            // Because tempQueue tracks origin, we can surgically remove them.
             
             // A. Remove Pending Items from DB
             const pendingIndicesToRemove = window.tempQueue
@@ -1222,8 +1223,7 @@
             });
 
             // B. Remove Calendar Items from DB 
-            // We must do this carefully. Since arrays shift when we splice, we must process in reverse order per day.
-            // First, group removals by Day.
+            // We only remove items that were actually in the queue.
             const calendarRemovals = {}; // Key: "YYYY-MM-DD", Value: [indices]
             
             window.tempQueue.forEach(item => {
@@ -1234,10 +1234,7 @@
                 }
             });
 
-            // Now execute removals day by day, sorting indices descending
             Object.keys(calendarRemovals).forEach(dateKey => {
-                // Parse key back to access appData
-                // dateKey format: "2024-01-15"
                 const parts = dateKey.split('-');
                 const mKey = `${parts[0]}-${parts[1]}`;
                 const day = parseInt(parts[2]);
@@ -1249,7 +1246,6 @@
                             window.appData[mKey].expenses[day].splice(idx, 1);
                         }
                     });
-                    // Cleanup empty days
                     if(window.appData[mKey].expenses[day].length === 0) {
                         delete window.appData[mKey].expenses[day];
                     }
@@ -1257,10 +1253,8 @@
             });
 
             // 3. Commit Temp Queue
-            // We re-run the simulation logic to be safe and get the exact date again
-            // NOTE: The `isSafeToSpend` logic must now run against the CLEARED appData
-            // So we don't pass an ignoreSet anymore, because we literally just deleted them.
-            
+            // Re-run simulation against the NOW CLEARED (for moved items) data
+            // We pass null for ignoredSignatureSet because we deleted the obstacles
             let simulatedExpenses = [];
             
             window.tempQueue.forEach(item => {
@@ -1269,7 +1263,7 @@
                 let dateCursor = new Date(today);
 
                 while (!placed && safety < 365) {
-                    const safe = window.isSafeToSpend(item.amount, dateCursor, simulatedExpenses);
+                    const safe = window.isSafeToSpend(item.amount, dateCursor, simulatedExpenses, null);
                     if (safe) {
                         const mKey = window.getMonthKey(dateCursor);
                         const day = dateCursor.getDate();
