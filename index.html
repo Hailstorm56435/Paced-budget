@@ -1253,9 +1253,9 @@
             });
 
             // 3. Commit Temp Queue
-            // Re-run simulation against the NOW CLEARED (for moved items) data
-            // We pass null for ignoredSignatureSet because we deleted the obstacles
-            let simulatedExpenses = [];
+            // We re-run the simulation logic to be safe and get the exact date again
+            // FIX: DO NOT use simulatedExpenses array here, or we double-count!
+            // isSafeToSpend will read directly from the live-updated appData
             
             window.tempQueue.forEach(item => {
                 let placed = false;
@@ -1263,7 +1263,9 @@
                 let dateCursor = new Date(today);
 
                 while (!placed && safety < 365) {
-                    const safe = window.isSafeToSpend(item.amount, dateCursor, simulatedExpenses, null);
+                    // Pass empty array for temp expenses because we are committing directly to appData
+                    // Pass null for ignore set because we already deleted the old ones
+                    const safe = window.isSafeToSpend(item.amount, dateCursor, [], null);
                     if (safe) {
                         const mKey = window.getMonthKey(dateCursor);
                         const day = dateCursor.getDate();
@@ -1280,8 +1282,8 @@
                             addedAt: new Date().toISOString()
                         };
 
+                        // COMMIT DIRECTLY
                         window.appData[mKey].expenses[day].push(cleanItem);
-                        simulatedExpenses.push({ monthKey: mKey, day: day, amount: item.amount });
                         placed = true;
                     } else {
                         dateCursor.setDate(dateCursor.getDate() + 1);
