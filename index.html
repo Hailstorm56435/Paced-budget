@@ -346,7 +346,6 @@
         <h4 style="margin-bottom:5px;">Email Notifications</h4>
         <p style="font-size:0.8rem; color:var(--text-sub); margin-top:0;">
             Add email addresses to be notified when items are scheduled for purchase.
-            <br><small>Note: Requires setup to send automatically.</small>
         </p>
 
         <div style="display:flex; gap:5px; margin-bottom:10px;">
@@ -386,7 +385,7 @@
     let unsubscribe = null; 
 
     // Initialize global immediately so UI doesn't crash on load
-    window.appData = { pending: [], emailList: [] };
+    window.appData = { pending: [], emailList: [], budget: 0 };
 
     // --- AUTH ---
     window.handleLogin = (e) => { e.preventDefault(); window.login(); };
@@ -432,8 +431,12 @@
                 window.appData = docSnap.data();
                 if (!window.appData.pending) window.appData.pending = [];
                 if (!window.appData.emailList) window.appData.emailList = [];
+                // Sync the main budget input if it's not currently focused
+                if(document.activeElement !== document.getElementById('budgetInput')) {
+                    document.getElementById('budgetInput').value = window.appData.budget || 0;
+                }
             } else {
-                window.appData = { pending: [], emailList: [] };
+                window.appData = { pending: [], emailList: [], budget: 0 };
             }
             window.refreshUI();
         });
@@ -442,7 +445,7 @@
     window.saveToCloud = async () => {
         if (!currentUser) return;
         try { 
-            await setDoc(doc(db, "users", currentUser.uid), window.appData); 
+            await setDoc(doc(db, "users", currentUser.uid), window.appData, {merge: true}); 
         } 
         catch (e) { console.error(e); }
     }
@@ -484,14 +487,61 @@
     window.currentDate = new Date();
     window.selectedDate = null;
     window.showHistory = false;
-    window.editingPendingIndex = -1; // -1 means new, >=0 means editing
-    window.editingExpenseIndex = -1; // For modal editing
+    window.editingPendingIndex = -1; 
+    window.editingExpenseIndex = -1;
 
     window.getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
 
     window.toggleHistory = () => {
         window.showHistory = !window.showHistory;
         window.renderCalendar();
+    };
+
+    window.changeMonth = (dir) => {
+        window.currentDate.setMonth(window.currentDate.getMonth() + dir);
+        window.renderCalendar();
+    };
+
+    // --- BUDGET & SETTINGS LOGIC ---
+    window.updateBudget = () => {
+        const val = parseFloat(document.getElementById('budgetInput').value) || 0;
+        window.appData.budget = val; // Save globally so Apps Script can see it
+        // Also save to month key for historical tracking if needed, but global is key for email
+        window.saveToCloud();
+        window.renderCalendar();
+    };
+
+    window.openSettings = () => {
+        document.getElementById('settingsModal').classList.add('active');
+        window.renderEmailList();
+    };
+    window.closeSettings = () => document.getElementById('settingsModal').classList.remove('active');
+
+    window.addNewEmail = () => {
+        const inp = document.getElementById('newEmailInput');
+        const email = inp.value.trim();
+        if(email && email.includes('@')) {
+            if(!window.appData.emailList) window.appData.emailList = [];
+            window.appData.emailList.push(email);
+            window.saveToCloud();
+            inp.value = '';
+            window.renderEmailList();
+        }
+    };
+    window.removeEmail = (idx) => {
+        window.appData.emailList.splice(idx, 1);
+        window.saveToCloud();
+        window.renderEmailList();
+    };
+    window.renderEmailList = () => {
+        const c = document.getElementById('emailListContainer');
+        c.innerHTML = '';
+        (window.appData.emailList || []).forEach((email, idx) => {
+            const div = document.createElement('div');
+            div.className = 'email-list-item';
+            div.innerHTML = `<span>${email}</span> <button class="btn-text" style="color:red;" onclick="removeEmail(${idx})">Remove</button>`;
+            c.appendChild(div);
+        });
     };
 
     // --- INBOX LOGIC ---
@@ -511,10 +561,9 @@
 
         if (isNaN(amt) || amt <= 0) return;
 
-        // Apply Tax logic immediately
         if(taxInput.checked) {
             amt = amt * 1.1;
-            amt = Math.round(amt * 100) / 100; // Round to 2 decimals
+            amt = Math.round(amt * 100) / 100; 
         }
 
         if (!window.appData.pending) window.appData.pending = [];
@@ -528,18 +577,16 @@
         };
 
         if (window.editingPendingIndex > -1) {
-            // Update existing
             window.appData.pending[window.editingPendingIndex] = newItem;
             window.editingPendingIndex = -1;
             document.getElementById('addPendingBtn').textContent = "Add to List";
             document.getElementById('cancelPendingEditBtn').style.display = 'none';
         } else {
-            // Add new
             window.appData.pending.push(newItem);
         }
         
         amtInput.value = ''; descInput.value = ''; linkInput.value = '';
-        taxInput.checked = false; // Reset tax check
+        taxInput.checked = false;
         window.saveToCloud();
     };
 
@@ -548,12 +595,12 @@
         document.getElementById('pendingAmount').value = item.amount;
         document.getElementById('pendingDesc').value = item.desc;
         document.getElementById('pendingLink').value = item.link || '';
-        document.getElementById('pendingTax').checked = false; // Assume already taxed
+        document.getElementById('pendingTax').checked = false; 
         
         window.editingPendingIndex = idx;
         document.getElementById('addPendingBtn').textContent = "Update";
         document.getElementById('cancelPendingEditBtn').style.display = 'inline-block';
-        window.renderPendingList(); // Re-render to show highlight
+        window.renderPendingList();
         document.getElementById('pendingDrawer').classList.add('open');
     };
 
@@ -562,7 +609,6 @@
         document.getElementById('pendingAmount').value = '';
         document.getElementById('pendingDesc').value = '';
         document.getElementById('pendingLink').value = '';
-        document.getElementById('pendingTax').checked = false;
         document.getElementById('addPendingBtn').textContent = "Add to List";
         document.getElementById('cancelPendingEditBtn').style.display = 'none';
         window.renderPendingList();
@@ -584,7 +630,6 @@
             div.className = 'pending-item';
             if(idx === window.editingPendingIndex) div.classList.add('editing');
             
-            // Smart Schedule Calc
             const suggestedDate = window.findNextAffordableDate(item.amount);
             let smartBtnHtml = suggestedDate 
                 ? `<button class="btn-success btn-sm" onclick="commitPending(${idx}, '${suggestedDate.toISOString()}')">Smart Schedule ${suggestedDate.toLocaleDateString('en-US', {month:'short', day:'numeric'})}</button>`
@@ -597,15 +642,12 @@
                     <span>${item.icon} ${item.desc} ${linkHtml}</span>
                     <span>$${item.amount.toFixed(2)}</span>
                 </div>
-                
                 <div class="pending-actions">
                     <div class="pending-edit-controls">
                         <button class="action-btn" onclick="editPending(${idx})">Edit</button>
                         <button class="action-btn" style="color:var(--danger); border-color:var(--danger);" onclick="deletePending(${idx})">Delete</button>
                     </div>
-
                     ${smartBtnHtml}
-
                     <div class="schedule-row">
                         <input type="date" id="manualDate-${idx}" class="manual-date-input">
                         <button class="action-btn" onclick="manualSchedule(${idx})">Move</button>
@@ -631,10 +673,7 @@
 
     window.manualSchedule = (idx) => {
         const dateVal = document.getElementById(`manualDate-${idx}`).value;
-        if(!dateVal) {
-            alert("Please pick a date first.");
-            return;
-        }
+        if(!dateVal) { alert("Please pick a date first."); return; }
         const parts = dateVal.split('-');
         const targetDate = new Date(parts[0], parts[1]-1, parts[2]);
         window.finalizeSchedule(idx, targetDate);
@@ -649,7 +688,6 @@
         if (!window.appData[monthKey].expenses) window.appData[monthKey].expenses = {};
         if (!window.appData[monthKey].expenses[day]) window.appData[monthKey].expenses[day] = [];
         
-        // Push the item as-is (tax is already inside item.amount)
         window.appData[monthKey].expenses[day].push({
             amount: item.amount,
             desc: item.desc,
@@ -679,10 +717,10 @@
 
         while (checks < maxChecks) {
             const monthKey = window.getMonthKey(checkDate);
-            let budget = (window.appData[monthKey] && window.appData[monthKey].budget) ? window.appData[monthKey].budget : currentBud;
+            // Use global budget logic
             const day = checkDate.getDate();
             const daysInMonth = new Date(checkDate.getFullYear(), checkDate.getMonth() + 1, 0).getDate();
-            const dailyPace = budget / daysInMonth;
+            const dailyPace = currentBud / daysInMonth;
             
             let spent = 0;
             if (window.appData[monthKey] && window.appData[monthKey].expenses) {
@@ -723,147 +761,130 @@
             historyContainer.style.display = 'none';
         }
 
-        let budget = 0;
-        if (window.appData[monthKey] && window.appData[monthKey].budget !== undefined) {
-            budget = window.appData[monthKey].budget;
-        } else {
-             let check = new Date(window.currentDate);
-             for(let i=0; i<6; i++) {
-                 check.setMonth(check.getMonth() - 1);
-                 const k = window.getMonthKey(check);
-                 if (window.appData[k] && window.appData[k].budget) { budget = window.appData[k].budget; break; }
-             }
-        }
-        document.getElementById('budgetInput').value = budget > 0 ? budget : '';
-
-        if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
-
-        const firstDay = new Date(year, month, 1).getDay();
+        // Budget Calculation
+        const totalBudget = window.appData.budget || 0;
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const dailyPace = budget / daysInMonth;
+        const dailyPace = totalBudget > 0 ? totalBudget / daysInMonth : 0;
+        let runningSpent = 0;
 
-        for (let i = 0; i < firstDay; i++) {
-            const cell = document.createElement('div');
-            cell.className = 'day-cell empty';
-            grid.appendChild(cell);
+        // Days loop
+        const firstDayIndex = new Date(year, month, 1).getDay();
+        
+        // Empty cells for desktop
+        if(window.innerWidth > 600) {
+            for (let i = 0; i < firstDayIndex; i++) {
+                const empty = document.createElement('div');
+                empty.className = 'day-cell empty';
+                grid.appendChild(empty);
+            }
         }
 
-        let cumulativeSpend = 0;
+        for (let d = 1; d <= daysInMonth; d++) {
+            const isToday = isCurrentMonth && d === todayDate.getDate();
+            const isPast = isCurrentMonth && d < todayDate.getDate();
 
-        for (let day = 1; day <= daysInMonth; day++) {
-            const dayExpenses = (window.appData[monthKey].expenses && window.appData[monthKey].expenses[day]) ? window.appData[monthKey].expenses[day] : [];
-            const daySpendTotal = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
-            cumulativeSpend += daySpendTotal;
+            if (isPast && !window.showHistory) continue;
 
-            const accruedBudget = dailyPace * day;
-            const availableBalance = accruedBudget - cumulativeSpend;
+            const dayExpenses = (window.appData[monthKey] && window.appData[monthKey].expenses && window.appData[monthKey].expenses[d]) 
+                ? window.appData[monthKey].expenses[d] 
+                : [];
 
-            if (isCurrentMonth && day < todayDate.getDate() && !window.showHistory) continue;
+            const dayTotal = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
+            runningSpent += dayTotal;
+            
+            const targetBalance = dailyPace * d;
+            const actualBalance = targetBalance - runningSpent;
 
             const cell = document.createElement('div');
-            cell.className = 'day-cell';
-            if (isCurrentMonth && day === todayDate.getDate()) cell.classList.add('today');
-            
-            cell.onclick = () => openModal(day);
+            cell.className = `day-cell ${isToday ? 'today' : ''}`;
+            cell.onclick = () => window.openModal(d);
 
-            let chipsHtml = dayExpenses.map(e => 
-                `<div class="expense-chip">${e.icon} $${e.amount.toFixed(2)} ${e.link ? '🔗' : ''}</div>`
-            ).join('');
-            
-            const balClass = availableBalance >= 0 ? 'bal-pos' : 'bal-neg';
-            const balText = budget > 0 ? `$${Math.round(availableBalance)}` : '-';
-            const dateObj = new Date(year, month, day);
-            
+            const date = new Date(year, month, d);
+            const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
+
+            let chipsHtml = '';
+            dayExpenses.forEach(exp => {
+                const linkIcon = exp.link ? '🔗' : '';
+                chipsHtml += `<div class="expense-chip">${exp.icon} ${exp.desc} ${linkIcon} -$${exp.amount.toFixed(0)}</div>`;
+            });
+
             cell.innerHTML = `
                 <div class="date-number">
-                    <span class="day-weekday">${dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</span>
-                    <span>${day}</span>
+                    <span>${d}</span>
+                    <span class="day-weekday">${weekday}</span>
                 </div>
                 <div class="expense-chips">${chipsHtml}</div>
-                <div class="balance-indicator ${balClass}">${balText}</div>
+                <div class="balance-indicator ${actualBalance >= 0 ? 'bal-pos' : 'bal-neg'}">
+                    ${actualBalance >= 0 ? '+' : ''}$${actualBalance.toFixed(0)}
+                </div>
             `;
             grid.appendChild(cell);
         }
-    }
-
-    window.changeMonth = (delta) => {
-        window.currentDate.setMonth(window.currentDate.getMonth() + delta);
-        window.renderCalendar();
     };
 
-    window.updateBudget = () => {
-        const val = parseFloat(document.getElementById('budgetInput').value);
-        const monthKey = window.getMonthKey(window.currentDate);
-        if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
-        window.appData[monthKey].budget = val;
-        window.saveToCloud();
-        window.renderCalendar();
-    };
-
-    // --- MODAL & EDITING ---
-
+    // --- EXPENSE MODAL ---
     window.openModal = (day) => {
-        window.selectedDate = day;
-        window.editingExpenseIndex = -1; // Reset to "New Mode"
-        
-        document.getElementById('modalTitle').textContent = 
-            `Expenses: ${window.currentDate.toLocaleDateString('en-US', { month: 'short' })} ${day}`;
-        
-        window.resetModalInputs();
-        window.renderModalList();
+        window.selectedDate = new Date(window.currentDate.getFullYear(), window.currentDate.getMonth(), day);
+        document.getElementById('modalTitle').textContent = `Expenses for ${window.selectedDate.toLocaleDateString()}`;
         document.getElementById('expenseModal').classList.add('active');
-        setTimeout(() => document.getElementById('expenseAmount').focus(), 100);
-    };
-
-    window.resetModalInputs = () => {
+        
+        // Reset Inputs
         document.getElementById('expenseAmount').value = '';
         document.getElementById('expenseDesc').value = '';
         document.getElementById('expenseLink').value = '';
         document.getElementById('expenseTax').checked = false;
         document.getElementById('modalSaveBtn').textContent = "Save Item";
         window.editingExpenseIndex = -1;
-        window.renderModalList(); // To remove active highlights
-    }
-
-    window.editExpenseInModal = (index) => {
-        const monthKey = window.getMonthKey(window.currentDate);
-        const item = window.appData[monthKey].expenses[window.selectedDate][index];
         
+        window.renderModalList();
+    };
+
+    window.closeModal = () => document.getElementById('expenseModal').classList.remove('active');
+
+    window.renderModalList = () => {
+        const list = document.getElementById('existingExpensesList');
+        list.innerHTML = '';
+        
+        const monthKey = window.getMonthKey(window.selectedDate);
+        const day = window.selectedDate.getDate();
+        const expenses = (window.appData[monthKey]?.expenses?.[day]) || [];
+
+        if(expenses.length === 0) {
+            list.innerHTML = '<div style="padding:10px; text-align:center; color:#999; font-size:0.8rem;">No expenses this day.</div>';
+            return;
+        }
+
+        expenses.forEach((item, idx) => {
+            const div = document.createElement('div');
+            div.className = 'expense-list-item';
+            if(idx === window.editingExpenseIndex) div.classList.add('editing');
+            
+            div.innerHTML = `
+                <div>${item.icon} ${item.desc} <b>$${item.amount.toFixed(2)}</b></div>
+                <button class="btn-text" style="color:red" onclick="deleteExpense(event, ${idx})">×</button>
+            `;
+            div.onclick = (e) => {
+                if(e.target.tagName === 'BUTTON') return;
+                window.loadExpenseForEdit(idx);
+            };
+            list.appendChild(div);
+        });
+    };
+
+    window.loadExpenseForEdit = (idx) => {
+        const monthKey = window.getMonthKey(window.selectedDate);
+        const day = window.selectedDate.getDate();
+        const item = window.appData[monthKey].expenses[day][idx];
+
         document.getElementById('expenseAmount').value = item.amount;
         document.getElementById('expenseDesc').value = item.desc;
         document.getElementById('expenseLink').value = item.link || '';
         document.getElementById('expenseTax').checked = false;
         
-        window.editingExpenseIndex = index;
+        window.editingExpenseIndex = idx;
         document.getElementById('modalSaveBtn').textContent = "Update Item";
-        window.renderModalList(); 
-    }
-
-    window.renderModalList = () => {
-        const monthKey = window.getMonthKey(window.currentDate);
-        const expenses = (window.appData[monthKey]?.expenses?.[window.selectedDate]) || [];
-        const container = document.getElementById('existingExpensesList');
-        container.innerHTML = '';
-        
-        expenses.forEach((ex, index) => {
-            const row = document.createElement('div');
-            row.className = 'expense-list-item';
-            if(index === window.editingExpenseIndex) row.classList.add('editing');
-
-            // Clicking the row triggers edit
-            row.onclick = () => window.editExpenseInModal(index);
-            
-            let linkIcon = ex.link ? `<a href="${ex.link}" target="_blank" onclick="event.stopPropagation()">🔗</a>` : '';
-
-            row.innerHTML = `
-                <span>${ex.icon} <b>$${ex.amount.toFixed(2)}</b> ${ex.desc} ${linkIcon}</span>
-                <button class="btn-danger-outline btn-sm" onclick="event.stopPropagation(); deleteExpense(${index})">Delete</button>
-            `;
-            container.appendChild(row);
-        });
+        window.renderModalList();
     };
-
-    window.closeModal = () => document.getElementById('expenseModal').classList.remove('active');
 
     window.saveExpense = () => {
         const amtInput = document.getElementById('expenseAmount');
@@ -871,102 +892,60 @@
         const linkInput = document.getElementById('expenseLink');
         const taxInput = document.getElementById('expenseTax');
 
-        let amount = parseFloat(amtInput.value);
-        const desc = descInput.value || 'Expense';
-        const link = window.fixLink(linkInput.value);
-        
-        if (isNaN(amount)) return;
+        let amt = parseFloat(amtInput.value);
+        if (isNaN(amt) || amt <= 0) return;
 
-        // Apply Tax logic
         if(taxInput.checked) {
-            amount = amount * 1.1;
-            amount = Math.round(amount * 100) / 100;
+            amt = amt * 1.1;
+            amt = Math.round(amt * 100) / 100;
         }
 
-        const monthKey = window.getMonthKey(window.currentDate);
-        if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
-        if (!window.appData[monthKey].expenses) window.appData[monthKey].expenses = {};
-        if (!window.appData[monthKey].expenses[window.selectedDate]) {
-            window.appData[monthKey].expenses[window.selectedDate] = [];
-        }
-
-        const newItem = {
-            amount: amount,
-            desc: desc,
-            link: link,
-            icon: window.getSmartIcon(desc)
+        const desc = descInput.value || 'Item';
+        const link = window.fixLink(linkInput.value);
+        const newItem = { 
+            amount: amt, 
+            desc: desc, 
+            link: link, 
+            icon: window.getSmartIcon(desc) 
         };
 
+        const monthKey = window.getMonthKey(window.selectedDate);
+        const day = window.selectedDate.getDate();
+
+        if (!window.appData[monthKey]) window.appData[monthKey] = { expenses: {} };
+        if (!window.appData[monthKey].expenses) window.appData[monthKey].expenses = {};
+        if (!window.appData[monthKey].expenses[day]) window.appData[monthKey].expenses[day] = [];
+
         if (window.editingExpenseIndex > -1) {
-            // Update Existing
-            window.appData[monthKey].expenses[window.selectedDate][window.editingExpenseIndex] = newItem;
+            window.appData[monthKey].expenses[day][window.editingExpenseIndex] = newItem;
         } else {
-            // Create New
-            window.appData[monthKey].expenses[window.selectedDate].push(newItem);
+            window.appData[monthKey].expenses[day].push(newItem);
         }
 
         window.saveToCloud();
-        window.resetModalInputs();
-        document.getElementById('expenseAmount').focus();
+        window.closeModal();
+        window.renderCalendar();
     };
 
-    window.deleteExpense = (index) => {
-        const monthKey = window.getMonthKey(window.currentDate);
-        if (index === window.editingExpenseIndex) window.resetModalInputs();
-        window.appData[monthKey].expenses[window.selectedDate].splice(index, 1);
-        window.saveToCloud();
-        window.renderModalList();
-    };
-
-    // --- SETTINGS (EMAIL LIST) ---
-    window.openSettings = () => {
-        window.renderEmailList();
-        document.getElementById('settingsModal').classList.add('active');
-    };
-    
-    window.closeSettings = () => {
-        document.getElementById('settingsModal').classList.remove('active');
-    };
-
-    window.addNewEmail = () => {
-        const input = document.getElementById('newEmailInput');
-        const email = input.value.trim();
-        if(email && email.includes('@')) {
-            if(!window.appData.emailList) window.appData.emailList = [];
-            window.appData.emailList.push(email);
+    window.deleteExpense = (e, idx) => {
+        e.stopPropagation();
+        if(confirm("Remove this item?")) {
+            const monthKey = window.getMonthKey(window.selectedDate);
+            const day = window.selectedDate.getDate();
+            window.appData[monthKey].expenses[day].splice(idx, 1);
             window.saveToCloud();
-            input.value = '';
-            window.renderEmailList();
+            
+            if(window.editingExpenseIndex === idx) {
+                // Reset edit mode if we deleted the item being edited
+                window.editingExpenseIndex = -1;
+                document.getElementById('modalSaveBtn').textContent = "Save Item";
+                document.getElementById('expenseAmount').value = '';
+                document.getElementById('expenseDesc').value = '';
+            }
+            window.renderModalList();
+            window.renderCalendar();
         }
     };
-
-    window.removeEmail = (idx) => {
-        if(confirm("Remove this email?")) {
-            window.appData.emailList.splice(idx, 1);
-            window.saveToCloud();
-            window.renderEmailList();
-        }
-    };
-
-    window.renderEmailList = () => {
-        const list = window.appData.emailList || [];
-        const container = document.getElementById('emailListContainer');
-        container.innerHTML = '';
-        if(list.length === 0) {
-            container.innerHTML = '<div style="padding:10px; color:#999; text-align:center;">No emails added.</div>';
-            return;
-        }
-        list.forEach((email, idx) => {
-            const div = document.createElement('div');
-            div.className = 'email-list-item';
-            div.innerHTML = `
-                <span>${email}</span>
-                <button class="btn-danger-outline btn-sm" onclick="removeEmail(${idx})">Remove</button>
-            `;
-            container.appendChild(div);
-        });
-    };
-
 </script>
 </body>
 </html>
