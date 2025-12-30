@@ -729,44 +729,6 @@
         } 
         catch (e) { console.error(e); }
     }
-
-    window.getSmartIcon = (desc) => {
-        if (!desc) return '💸';
-        const d = desc.toLowerCase();
-        const map = {
-            'coffee': '☕', 'latte': '☕', 'starbucks': '☕',
-            'lunch': '🥪', 'dinner': '🍽️', 'breakfast': '🍳', 'restaurant': '🍽️',
-            'burger': '🍔', 'pizza': '🍕', 'sushi': '🍣', 'taco': '🌮',
-            'beer': '🍺', 'wine': '🍷', 'drink': '🍹', 'bar': '🍸',
-            'groceries': '🛒', 'market': '🛒', 'whole foods': '🛒', 'trader': '🛒',
-            
-            'gas': '⛽', 'fuel': '⛽', 'shell': '⛽', 'chevron': '⛽',
-            'uber': '🚕', 'lyft': '🚕', 'taxi': '🚕',
-            'bus': '🚌', 'train': '🚆', 'metro': '🚇',
-            'flight': '✈️', 'airline': '✈️', 'parking': '🅿️',
-            
-            'rent': '🏠', 'mortgage': '🏠',
-            'electric': '💡', 'power': '💡', 'water': '💧',
-            'internet': '🌐', 'wifi': '🌐', 'phone': '📱', 'mobile': '📱',
-            'insurance': '🛡️', 'tax': '🏛️',
-            
-            'amazon': '📦', 'delivery': '📦', 'shipping': '📦',
-            'target': '🎯', 'walmart': '🛍️', 'clothes': '👕', 'shoes': '👟',
-            
-            'movie': '🎬', 'cinema': '🎬', 'netflix': '🎬',
-            'game': '🎮', 'steam': '🎮', 'nintendo': '🎮',
-            'spotify': '🎵', 'music': '🎵', 'concert': '🎫',
-            
-            'gym': '💪', 'fitness': '💪', 'workout': '💪',
-            'doctor': '👨‍⚕️', 'dentist': '🦷', 'pharmacy': '💊',
-            'haircut': '✂️', 'salon': '✂️',
-            
-            'dog': '🐕', 'cat': '🐈', 'vet': '🐾', 'pet': '🐾',
-            'gift': '🎁', 'donation': '❤️'
-        };
-        for (let k in map) { if (d.includes(k)) return map[k]; }
-        return '💸';
-    };
     
     window.fixLink = (url) => {
         if(!url) return '';
@@ -1330,7 +1292,6 @@
             amount: amt,
             desc: desc,
             link: link,
-            icon: window.getSmartIcon(desc),
             addedAt: new Date().toISOString()
         };
 
@@ -1766,7 +1727,6 @@
             amount: amt,
             desc: desc,
             link: link,
-            icon: window.getSmartIcon(desc),
             addedAt: new Date().toISOString()
         };
 
