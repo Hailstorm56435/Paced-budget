@@ -1828,7 +1828,7 @@
             el.style.transition = 'all 0.3s';
             setTimeout(() => el.remove(), 300);
         }, 3000);
-    };
+    };//
 
     window.exportData = () => {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.appData, null, 2));
@@ -1839,7 +1839,7 @@
         downloadAnchorNode.click();
         downloadAnchorNode.remove();
         window.showToast("Data export started!", "success");
-    };
+    }; 
 
 </script>
 </body>
