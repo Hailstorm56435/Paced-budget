@@ -107,9 +107,6 @@
             font-size: 0.8rem; padding: 5px 10px; border: 1px solid var(--border);
         }
 
-        /* SVG Icon styling */
-        .icon-svg { width: 18px; height: 18px; fill: currentColor; }
-
         input[type="text"], input[type="number"], input[type="email"], input[type="password"], input[type="url"], input[type="date"] {
             padding: 10px; border: 1px solid var(--border); border-radius: 8px;
             font-size: 1rem; background: #fff; width: 100%;
@@ -190,8 +187,15 @@
         .day-weekday { display: none; }
         
         .expense-chips { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; }
-        .expense-chip { font-size: 0.75rem; color: var(--text-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px;}
-        .link-icon { font-size: 0.7rem; text-decoration: none; }
+        
+        /* Updated Chip Style: Truncation logic */
+        .expense-chip { 
+            font-size: 0.75rem; color: var(--text-sub); 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+            display: block; /* Changed from flex to block to allow simple text truncation */
+            background: #f1f5f9; padding: 2px 6px; border-radius: 4px;
+        }
+        .chip-desc-text { opacity: 0.7; margin-left: 4px; font-weight: normal; }
 
         .balance-indicator { font-size: 0.8rem; font-weight: 700; text-align: right; margin-top: auto; }
         .bal-pos { color: var(--success); }
@@ -247,7 +251,12 @@
             .day-cell.today .day-weekday { color: rgba(255,255,255,0.8); }
 
             .expense-chips { flex-direction: row; flex-wrap: wrap; gap: 6px; align-content: center; }
-            .expense-chip { background: #f1f5f9; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; }
+            
+            /* Mobile specific chip override to handle truncation safely */
+            .expense-chip { 
+                background: #f1f5f9; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;
+                max-width: 140px; /* Force truncation on mobile */
+            }
             
             .balance-indicator { margin-top: 0; font-size: 0.95rem; min-width: 70px; }
             
@@ -726,40 +735,33 @@
         if (!desc) return '💸';
         const d = desc.toLowerCase();
         const map = {
-            // Food & Drink
             'coffee': '☕', 'latte': '☕', 'starbucks': '☕',
             'lunch': '🥪', 'dinner': '🍽️', 'breakfast': '🍳', 'restaurant': '🍽️',
             'burger': '🍔', 'pizza': '🍕', 'sushi': '🍣', 'taco': '🌮',
             'beer': '🍺', 'wine': '🍷', 'drink': '🍹', 'bar': '🍸',
             'groceries': '🛒', 'market': '🛒', 'whole foods': '🛒', 'trader': '🛒',
             
-            // Transport
             'gas': '⛽', 'fuel': '⛽', 'shell': '⛽', 'chevron': '⛽',
             'uber': '🚕', 'lyft': '🚕', 'taxi': '🚕',
             'bus': '🚌', 'train': '🚆', 'metro': '🚇',
             'flight': '✈️', 'airline': '✈️', 'parking': '🅿️',
             
-            // Bills & Util
             'rent': '🏠', 'mortgage': '🏠',
             'electric': '💡', 'power': '💡', 'water': '💧',
             'internet': '🌐', 'wifi': '🌐', 'phone': '📱', 'mobile': '📱',
             'insurance': '🛡️', 'tax': '🏛️',
             
-            // Shopping
             'amazon': '📦', 'delivery': '📦', 'shipping': '📦',
             'target': '🎯', 'walmart': '🛍️', 'clothes': '👕', 'shoes': '👟',
             
-            // Entertainment
             'movie': '🎬', 'cinema': '🎬', 'netflix': '🎬',
             'game': '🎮', 'steam': '🎮', 'nintendo': '🎮',
             'spotify': '🎵', 'music': '🎵', 'concert': '🎫',
             
-            // Health & Self
             'gym': '💪', 'fitness': '💪', 'workout': '💪',
             'doctor': '👨‍⚕️', 'dentist': '🦷', 'pharmacy': '💊',
             'haircut': '✂️', 'salon': '✂️',
             
-            // Other
             'dog': '🐕', 'cat': '🐈', 'vet': '🐾', 'pet': '🐾',
             'gift': '🎁', 'donation': '❤️'
         };
@@ -1204,19 +1206,6 @@
             });
 
             // B. Remove Calendar Items from DB 
-            // (Only wipe days IF we have scheduled items for them? 
-            // Or stick to the "Wipe Future" logic? "Wipe Future" is safer/cleaner for a total replan)
-            // The request was "Execute the plan queue". 
-            // If the user only added "Unscheduled" to the queue, they probably DON'T want to wipe their existing calendar.
-            // BUT, if they added "Scheduled" items, those items are now in the queue.
-            
-            // BETTER LOGIC: 
-            // Any item in `tempQueue` that came from the calendar is effectively "moved".
-            // Any item that was on the calendar but NOT added to the queue should technically stay put?
-            // However, the previous logic (and user intent usually) with "Plan Queue" implies a full reschedule.
-            // Let's stick to the "Clean Slate Future" logic for simplicity and robustness against conflicts.
-            // It ensures no double booking.
-            
             Object.keys(window.appData).forEach(key => {
                 if(!key.match(/^\d{4}-\d{2}$/)) return;
                 const monthData = window.appData[key];
@@ -1556,7 +1545,7 @@
             let chipsHtml = '';
             dayExpenses.forEach(exp => {
                 chipsHtml += `<div class="expense-chip" title="${exp.desc}">
-                    ${exp.icon || '💸'} $${exp.amount.toFixed(0)}
+                    ${exp.icon || '💸'} $${exp.amount.toFixed(0)} <span class="chip-desc-text">${exp.desc}</span>
                 </div>`;
             });
 
