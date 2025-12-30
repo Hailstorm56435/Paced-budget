@@ -14,10 +14,11 @@
     <style>
         :root {
             --primary: #2563eb;
+            --primary-dark: #1e40af;
             --success: #16a34a;
             --danger: #dc2626;
             --warning: #f59e0b;
-            --bg: #f1f5f9;
+            --bg: #f8fafc;
             --surface: #ffffff;
             --border: #e2e8f0;
             --text-main: #0f172a;
@@ -51,7 +52,9 @@
             display: flex; align-items: center; justify-content: center;
             font-size: 1.2rem; cursor: pointer; border: 2px solid white;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: background 0.2s;
         }
+        .profile-btn:hover { background: #cbd5e1; }
 
         .controls {
             background: var(--surface); padding: 15px; border-radius: 12px;
@@ -75,25 +78,37 @@
             padding: 8px; border-radius: 6px; text-align: center; border: 1px solid #e2e8f0;
         }
 
-        .top-actions { display: flex; gap: 10px; flex-wrap: wrap;}
+        .top-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
         /* --- BUTTONS & INPUTS --- */
         button {
             background: var(--primary); color: white; border: none; padding: 10px 16px;
             border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer;
             display: inline-flex; align-items: center; justify-content: center;
+            transition: opacity 0.2s;
         }
         button:active { opacity: 0.8; transform: scale(0.98); }
-        button.btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+        
+        button.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-main); }
+        button.btn-outline:hover { background: #f1f5f9; border-color: #cbd5e1; }
+        
         button.btn-text { background: transparent; color: var(--text-sub); padding: 5px; }
+        button.btn-text:hover { color: var(--text-main); }
+        
         button.btn-success { background: var(--success); }
+        
         button.btn-danger-outline { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+        button.btn-danger-outline:hover { background: #fef2f2; }
+        
         button.btn-sm { padding: 6px 12px; font-size: 0.8rem; }
         
         button.action-btn { 
             background: #f1f5f9; color: var(--text-main); font-weight: 500; 
             font-size: 0.8rem; padding: 5px 10px; border: 1px solid var(--border);
         }
+
+        /* SVG Icon styling */
+        .icon-svg { width: 18px; height: 18px; fill: currentColor; }
 
         input[type="text"], input[type="number"], input[type="email"], input[type="password"], input[type="url"], input[type="date"] {
             padding: 10px; border: 1px solid var(--border); border-radius: 8px;
@@ -106,7 +121,7 @@
         }
         input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
 
-        /* --- INBOX / PENDING DRAWER --- */
+        /* --- INBOX / UNSCHEDULED DRAWER --- */
         #inboxBtn { width: 100%; text-align: left; justify-content: space-between; flex-grow: 1; }
 
         .pending-drawer {
@@ -261,7 +276,7 @@
         }
 
         /* Custom Confirm Modal */
-        #confirmModal { z-index: 3000; } /* Ensure it's on top */
+        #confirmModal { z-index: 3000; } 
         #confirmModal .modal-content { max-width: 350px; text-align: center; }
         .confirm-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: center; }
         .confirm-actions button { min-width: 80px; }
@@ -377,14 +392,14 @@
 
             <div class="top-actions">
                 <button class="btn-outline" onclick="toggleInbox()" id="inboxBtn">
-                    <span>📂 Unscheduled Expenses</span>
+                    <span>Unscheduled</span>
                     <span id="inboxCount" style="background:var(--primary); color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">0</span>
                 </button>
                 <button class="btn-outline" onclick="openQueueModal()">
-                    <span>📋 Plan Queue</span>
+                    <span>Planning Queue</span>
                 </button>
                 <button class="btn-danger-outline" onclick="unscheduleAll()" title="Unschedule All" style="font-size:0.85rem;">
-                    ♻️ Reset
+                    Reset Schedule
                 </button>
             </div>
         </div>
@@ -458,7 +473,7 @@
 
 <div class="modal" id="settingsModal">
     <div class="modal-content">
-        <h3 style="margin-top:0;">⚙️ Profile & Settings</h3>
+        <h3 style="margin-top:0;">Settings</h3>
         
         <div style="margin-bottom:20px;">
             <label style="font-size:0.8rem; color:var(--text-sub);">Account Name</label>
@@ -517,7 +532,7 @@
 
 <div class="modal" id="queueModal">
     <div class="modal-content">
-        <h3 style="margin-top:0; margin-bottom:10px;">📋 Queue</h3>
+        <h3 style="margin-top:0; margin-bottom:10px;">Planning Queue</h3>
         
         <div class="queue-toolbar" style="display:flex; gap:5px; margin-bottom:15px; flex-wrap:wrap;">
             <button class="btn-sm btn-outline" onclick="addScheduledToQueue()">+ Scheduled</button>
@@ -529,7 +544,7 @@
             </div>
         
         <div style="display:flex; flex-direction:column; gap:10px;">
-            <button class="btn-success" onclick="applySmartSchedule()">✨ Auto-Schedule to Budget</button>
+            <button class="btn-success" onclick="applySmartSchedule()">Apply Schedule</button>
             <button class="btn-text" onclick="closeQueueModal()">Cancel</button>
         </div>
     </div>
@@ -545,6 +560,7 @@
         <div style="line-height:1.5; color:var(--text-main); font-size:0.9rem; overflow-y:auto;">
             <h4 style="margin:0 0 5px 0; color:var(--primary);">1. The Goal: Fixing "Front-Loading"</h4>
             <p style="margin-top:0; color:var(--text-sub);">
+                The primary cause of budget failure is "front-loading": spending too much at the start of the month.
                 PaceBudget treats your monthly budget as a <strong>daily wage</strong>. If your budget is $300, you have $10 today. You must wait to "accrue" funds.
             </p>
 
@@ -560,7 +576,7 @@
 
             <h4 style="margin:20px 0 5px 0; color:var(--primary);">4. Smart Scheduling & The Queue</h4>
             <p style="margin-top:0; color:var(--text-sub);">
-                Use the Queue to prioritize items. The AI calculates the earliest date you can afford an item without breaking your budget.
+                Use the Planning Queue to prioritize items. The AI calculates the earliest date you can afford an item without breaking your budget.
             </p>
         </div>
         
@@ -710,9 +726,42 @@
         if (!desc) return '💸';
         const d = desc.toLowerCase();
         const map = {
-            'coffee':'☕','food':'🍔','groceries':'🛒','gas':'⛽','rent':'🏠',
-            'gym':'💪','movie':'🎬','game':'🎮','dog':'🐕','bill':'📄','beer':'🍺',
-            'wine':'🍷','lunch':'🥪','dinner':'🍽️','amazon':'📦', 'target':'🎯'
+            // Food & Drink
+            'coffee': '☕', 'latte': '☕', 'starbucks': '☕',
+            'lunch': '🥪', 'dinner': '🍽️', 'breakfast': '🍳', 'restaurant': '🍽️',
+            'burger': '🍔', 'pizza': '🍕', 'sushi': '🍣', 'taco': '🌮',
+            'beer': '🍺', 'wine': '🍷', 'drink': '🍹', 'bar': '🍸',
+            'groceries': '🛒', 'market': '🛒', 'whole foods': '🛒', 'trader': '🛒',
+            
+            // Transport
+            'gas': '⛽', 'fuel': '⛽', 'shell': '⛽', 'chevron': '⛽',
+            'uber': '🚕', 'lyft': '🚕', 'taxi': '🚕',
+            'bus': '🚌', 'train': '🚆', 'metro': '🚇',
+            'flight': '✈️', 'airline': '✈️', 'parking': '🅿️',
+            
+            // Bills & Util
+            'rent': '🏠', 'mortgage': '🏠',
+            'electric': '💡', 'power': '💡', 'water': '💧',
+            'internet': '🌐', 'wifi': '🌐', 'phone': '📱', 'mobile': '📱',
+            'insurance': '🛡️', 'tax': '🏛️',
+            
+            // Shopping
+            'amazon': '📦', 'delivery': '📦', 'shipping': '📦',
+            'target': '🎯', 'walmart': '🛍️', 'clothes': '👕', 'shoes': '👟',
+            
+            // Entertainment
+            'movie': '🎬', 'cinema': '🎬', 'netflix': '🎬',
+            'game': '🎮', 'steam': '🎮', 'nintendo': '🎮',
+            'spotify': '🎵', 'music': '🎵', 'concert': '🎫',
+            
+            // Health & Self
+            'gym': '💪', 'fitness': '💪', 'workout': '💪',
+            'doctor': '👨‍⚕️', 'dentist': '🦷', 'pharmacy': '💊',
+            'haircut': '✂️', 'salon': '✂️',
+            
+            // Other
+            'dog': '🐕', 'cat': '🐈', 'vet': '🐾', 'pet': '🐾',
+            'gift': '🎁', 'donation': '❤️'
         };
         for (let k in map) { if (d.includes(k)) return map[k]; }
         return '💸';
