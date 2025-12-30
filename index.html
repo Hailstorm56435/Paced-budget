@@ -75,7 +75,7 @@
             padding: 8px; border-radius: 6px; text-align: center; border: 1px solid #e2e8f0;
         }
 
-        .top-actions { display: flex; gap: 10px; }
+        .top-actions { display: flex; gap: 10px; flex-wrap: wrap;}
 
         /* --- BUTTONS & INPUTS --- */
         button {
@@ -260,6 +260,11 @@
             max-height: 85vh; overflow-y: auto; display: flex; flex-direction: column;
         }
 
+        /* Custom Confirm Modal */
+        #confirmModal .modal-content { max-width: 350px; text-align: center; }
+        .confirm-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: center; }
+        .confirm-actions button { min-width: 80px; }
+
         .expense-list-item {
             padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;
             cursor: pointer; transition: background 0.2s;
@@ -287,6 +292,7 @@
         .queue-arrow { 
             border: 1px solid #ddd; background: #f8fafc; width: 24px; height: 24px; 
             display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 4px;
+            font-size: 0.8rem;
         }
         .queue-arrow:hover { background: #e2e8f0; }
 
@@ -308,6 +314,17 @@
 </div>
 
 <div id="toast-container"></div>
+
+<div class="modal" id="confirmModal">
+    <div class="modal-content">
+        <h3 id="confirmTitle" style="margin-top:0;">Confirm</h3>
+        <p id="confirmMessage" style="color:var(--text-sub);">Are you sure?</p>
+        <div class="confirm-actions">
+            <button class="btn-outline" onclick="closeConfirm()">Cancel</button>
+            <button id="confirmYesBtn">Yes</button>
+        </div>
+    </div>
+</div>
 
 <div class="container">
     <header>
@@ -364,6 +381,9 @@
                 </button>
                 <button class="btn-outline" onclick="openQueueModal()">
                     <span>📋 Plan Queue</span>
+                </button>
+                <button class="btn-danger-outline" onclick="unscheduleAll()" title="Unschedule All" style="font-size:0.85rem;">
+                    ♻️ Reset
                 </button>
             </div>
         </div>
@@ -497,7 +517,10 @@
 <div class="modal" id="queueModal">
     <div class="modal-content">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h3 style="margin:0;">📋 Upcoming Queue</h3>
+            <div style="display:flex; align-items:center; gap:5px;">
+                <h3 style="margin:0;">📋 Queue</h3>
+                <button class="btn-text" title="Randomize" onclick="randomizeQueue()" style="font-size:1.2rem;">🔀</button>
+            </div>
             <label class="checkbox-wrapper" style="font-size:0.85rem; background:#f1f5f9; padding:5px 10px; border-radius:12px;">
                 <input type="checkbox" id="includePendingInQueue" onchange="window.openQueueModal()"> Include Unscheduled
             </label>
@@ -527,7 +550,6 @@
         <div style="line-height:1.5; color:var(--text-main); font-size:0.9rem; overflow-y:auto;">
             <h4 style="margin:0 0 5px 0; color:var(--primary);">1. The Goal: Fixing "Front-Loading"</h4>
             <p style="margin-top:0; color:var(--text-sub);">
-                The primary cause of budget failure is "front-loading": spending too much at the start of the month.
                 PaceBudget treats your monthly budget as a <strong>daily wage</strong>. If your budget is $300, you have $10 today. You must wait to "accrue" funds.
             </p>
 
@@ -543,7 +565,7 @@
 
             <h4 style="margin:20px 0 5px 0; color:var(--primary);">4. Smart Scheduling & The Queue</h4>
             <p style="margin-top:0; color:var(--text-sub);">
-                Use the Queue to prioritize items. The AI calculates the earliest date you can afford an item without breaking your budget (going negative) on any future day.
+                Use the Queue to prioritize items. The AI calculates the earliest date you can afford an item without breaking your budget.
             </p>
         </div>
         
@@ -625,42 +647,38 @@
     window.changeLoginEmail = () => {
         const email1 = document.getElementById('newLoginEmail').value;
         const email2 = document.getElementById('confirmLoginEmail').value;
-        
         if(!email1 || email1 !== email2) {
             window.showToast("Email addresses do not match.", "error");
             return;
         }
-        
-        if(!confirm("Change login email?")) return;
-
-        if(currentUser) {
-            updateEmail(currentUser, email1).then(() => {
-                window.showToast("Email updated!", "success");
-                document.getElementById('currentUserEmailDisplay').textContent = email1;
-                document.getElementById('newLoginEmail').value = '';
-                document.getElementById('confirmLoginEmail').value = '';
-            }).catch(err => window.showToast(err.message, "error"));
-        }
+        window.showCustomConfirm("Change login email?", () => {
+            if(currentUser) {
+                updateEmail(currentUser, email1).then(() => {
+                    window.showToast("Email updated!", "success");
+                    document.getElementById('currentUserEmailDisplay').textContent = email1;
+                    document.getElementById('newLoginEmail').value = '';
+                    document.getElementById('confirmLoginEmail').value = '';
+                }).catch(err => window.showToast(err.message, "error"));
+            }
+        });
     };
 
     window.changeLoginPass = () => {
         const pass1 = document.getElementById('newLoginPass').value;
         const pass2 = document.getElementById('confirmLoginPass').value;
-        
         if(!pass1 || pass1 !== pass2) {
             window.showToast("Passwords do not match.", "error");
             return;
         }
-        
-        if(!confirm("Change password?")) return;
-
-        if(currentUser) {
-            updatePassword(currentUser, pass1).then(() => {
-                window.showToast("Password updated!", "success");
-                document.getElementById('newLoginPass').value = '';
-                document.getElementById('confirmLoginPass').value = '';
-            }).catch(err => window.showToast(err.message, "error"));
-        }
+        window.showCustomConfirm("Change password?", () => {
+            if(currentUser) {
+                updatePassword(currentUser, pass1).then(() => {
+                    window.showToast("Password updated!", "success");
+                    document.getElementById('newLoginPass').value = '';
+                    document.getElementById('confirmLoginPass').value = '';
+                }).catch(err => window.showToast(err.message, "error"));
+            }
+        });
     }
 
     function startDataListener(uid) {
@@ -734,7 +752,7 @@
     window.editingPendingIndex = -1; 
     window.editingExpenseIndex = -1;
     window.reschedulingIndex = -1; 
-    window.tempQueue = []; // Unified queue for planning
+    window.tempQueue = []; 
 
     window.getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
 
@@ -784,6 +802,22 @@
         }
         return true;
     }
+
+    // --- CUSTOM CONFIRM SYSTEM ---
+    window.confirmCallback = null;
+    window.showCustomConfirm = (msg, callback) => {
+        document.getElementById('confirmMessage').textContent = msg;
+        window.confirmCallback = callback;
+        document.getElementById('confirmModal').classList.add('active');
+        document.getElementById('confirmYesBtn').onclick = () => {
+            if(window.confirmCallback) window.confirmCallback();
+            window.closeConfirm();
+        };
+    };
+    window.closeConfirm = () => {
+        document.getElementById('confirmModal').classList.remove('active');
+        window.confirmCallback = null;
+    };
 
     // --- SETTINGS ---
     window.openSettings = () => {
@@ -837,7 +871,6 @@
         const today = new Date();
         today.setHours(0,0,0,0);
         
-        // 1. Get Scheduled Future Items
         Object.keys(window.appData).forEach(key => {
             if(!key.match(/^\d{4}-\d{2}$/)) return;
             const monthData = window.appData[key];
@@ -859,23 +892,19 @@
             });
         });
 
-        // 2. Add Pending Items if checked
         const includePending = document.getElementById('includePendingInQueue').checked;
         if (includePending && window.appData.pending) {
             window.appData.pending.forEach((item, idx) => {
                 window.tempQueue.push({
                     ...item,
                     sourceType: 'pending',
-                    originalIndex: idx // Track index to remove later
+                    originalIndex: idx 
                 });
             });
         }
 
-        // Sort: Calendar items by date, then Pending items
         window.tempQueue.sort((a,b) => {
-            // If both calendar, sort by date
             if(a.sourceType === 'calendar' && b.sourceType === 'calendar') return a.originalDate - b.originalDate;
-            // If one is pending, push to end (initially)
             if(a.sourceType === 'pending' && b.sourceType === 'calendar') return 1;
             if(a.sourceType === 'calendar' && b.sourceType === 'pending') return -1;
             return 0;
@@ -888,34 +917,37 @@
     window.closeQueueModal = () => document.getElementById('queueModal').classList.remove('active');
 
     window.removeFromQueue = (idx) => {
-        // Just removes from tempQueue, doesn't delete from DB
         window.tempQueue.splice(idx, 1);
         window.renderQueueList();
     };
+
+    window.randomizeQueue = () => {
+        for (let i = window.tempQueue.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [window.tempQueue[i], window.tempQueue[j]] = [window.tempQueue[j], window.tempQueue[i]];
+        }
+        window.renderQueueList();
+    }
 
     window.renderQueueList = () => {
         const c = document.getElementById('queueContainer');
         c.innerHTML = '';
         
-        // --- REAL TIME SIMULATION ---
-        // Calculate projected dates for the current tempQueue order
+        // Simulation
         const today = new Date();
         today.setHours(0,0,0,0);
         let dateCursor = new Date(today);
-        let simulatedExpenses = []; // To track accumulation during this simulation
+        let simulatedExpenses = []; 
 
         window.tempQueue.forEach(item => {
             let placed = false;
             let safety = 0;
-            // Always try to pack from today onwards
             dateCursor = new Date(today);
 
             while (!placed && safety < 365) {
-                // Check safety against "clean slate" future + simulated items
                 const safe = window.isSafeToSpend(item.amount, dateCursor, simulatedExpenses);
                 if (safe) {
-                    item._projectedDate = new Date(dateCursor); // Store for display
-                    
+                    item._projectedDate = new Date(dateCursor); 
                     const mKey = window.getMonthKey(dateCursor);
                     simulatedExpenses.push({ 
                         monthKey: mKey, 
@@ -929,7 +961,6 @@
                 safety++;
             }
         });
-        // -----------------------------
 
         if (window.tempQueue.length === 0) {
             c.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Queue is empty.</div>';
@@ -944,15 +975,16 @@
                 ? `👉 Est: ${item._projectedDate.toLocaleDateString('en-US', {month:'short', day:'numeric'})}`
                 : `<span style="color:red">Budget Tight</span>`;
 
-            // Unscheduled items get a remove 'x' button
             let removeBtn = item.sourceType === 'pending' 
                 ? `<button class="btn-text" style="color:#aaa; font-size:1.2rem; line-height:1;" onclick="removeFromQueue(${idx})">×</button>`
                 : '';
 
             div.innerHTML = `
                 <div class="queue-controls">
+                    <div class="queue-arrow" onclick="moveQueueItemToExtreme(${idx}, -1)" title="Move First">⇈</div>
                     <div class="queue-arrow" onclick="moveQueueItem(${idx}, -1)">▲</div>
                     <div class="queue-arrow" onclick="moveQueueItem(${idx}, 1)">▼</div>
+                    <div class="queue-arrow" onclick="moveQueueItemToExtreme(${idx}, 1)" title="Move Last">⇊</div>
                 </div>
                 <div class="queue-details">
                     <div>${item.desc} ${item.sourceType === 'pending' ? '<span style="font-size:0.7rem; background:#fef3c7; padding:1px 4px; border-radius:4px;">New</span>' : ''}</div>
@@ -978,6 +1010,51 @@
         window.renderQueueList();
     };
 
+    window.moveQueueItemToExtreme = (idx, dir) => {
+        const item = window.tempQueue.splice(idx, 1)[0];
+        if (dir === -1) {
+            window.tempQueue.unshift(item);
+        } else {
+            window.tempQueue.push(item);
+        }
+        window.renderQueueList();
+    }
+
+    // --- UNSCHEDULE ALL ---
+    window.unscheduleAll = () => {
+        window.showCustomConfirm("Unschedule ALL future calendar items and move them to Inbox?", () => {
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            // Gather items
+            Object.keys(window.appData).forEach(key => {
+                if(!key.match(/^\d{4}-\d{2}$/)) return;
+                const monthData = window.appData[key];
+                if(!monthData.expenses) return;
+
+                Object.keys(monthData.expenses).forEach(day => {
+                    const parts = key.split('-');
+                    const itemDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(day));
+                    
+                    if (itemDate >= today) {
+                        if(!window.appData.pending) window.appData.pending = [];
+                        // Move all
+                        monthData.expenses[day].forEach(exp => {
+                            window.appData.pending.push(exp);
+                        });
+                        // Clear day
+                        delete monthData.expenses[day];
+                    }
+                });
+            });
+            
+            window.saveToCloud();
+            window.renderCalendar();
+            window.renderPendingList(); // Update Inbox count
+            window.showToast("All items moved to Inbox", "success");
+        });
+    }
+
     // --- SOLVENCY CHECK ---
     window.isSafeToSpend = (amount, checkDate, tempAddedExpenses = []) => {
         const monthlyBudget = window.getBudgetForDate(checkDate);
@@ -987,16 +1064,6 @@
         const daysInMonth = new Date(y, m+1, 0).getDate();
         const dailyRate = monthlyBudget / daysInMonth; 
         const mKey = window.getMonthKey(checkDate);
-
-        // We want to simulate a "Clean Slate" future for the days we are overwriting.
-        // HOWEVER, `appData` currently contains the old scheduled items. 
-        // If we use `appData` directly, we are double-counting.
-        // Strategy: We will calculate the base balance assuming *ZERO* scheduled expenses 
-        // for dates >= Today, and only add back the `tempAddedExpenses`.
-        
-        // NOTE: This logic assumes we are wiping ALL future expenses.
-        // So for any day D >= Today, existing appData expenses should be IGNORED.
-        // For day D < Today, we keep history.
 
         const today = new Date();
         today.setHours(0,0,0,0);
@@ -1018,7 +1085,7 @@
             });
         }
 
-        // 2. Add Temp Simulated Expenses (The new queue plan)
+        // 2. Add Temp Simulated Expenses
         tempAddedExpenses.forEach(t => {
             if(t.monthKey === mKey) {
                 dailyExpenses[t.day] += t.amount;
@@ -1043,88 +1110,80 @@
 
     // --- QUEUE EXECUTION ---
     window.applySmartSchedule = () => {
-        if(!confirm("Reschedule everything based on this plan?")) return;
+        window.showCustomConfirm("Reschedule everything based on this plan?", () => {
+            // 1. Identify Unscheduled items that are being scheduled
+            const pendingIndicesToRemove = window.tempQueue
+                .filter(i => i.sourceType === 'pending')
+                .map(i => i.originalIndex)
+                .sort((a,b) => b - a); 
 
-        // 1. Identify Unscheduled items that are being scheduled
-        // We need to remove them from `appData.pending`
-        // Since we are iterating, let's build a new pending list that excludes them
-        // Using IDs would be better, but we can match by reference or rebuild.
-        // Simpler: If `sourceType` is pending, we find it in pending array and remove it.
-        // BUT, `tempQueue` objects are copies.
-        // Let's gather the *original indices* of pending items used.
-        const pendingIndicesToRemove = window.tempQueue
-            .filter(i => i.sourceType === 'pending')
-            .map(i => i.originalIndex)
-            .sort((a,b) => b - a); // Descending sort to splice correctly
-
-        // Remove from Pending DB
-        pendingIndicesToRemove.forEach(idx => {
-            if(idx > -1 && idx < window.appData.pending.length) {
-                window.appData.pending.splice(idx, 1);
-            }
-        });
-
-        // 2. Clear Future Calendar
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        
-        Object.keys(window.appData).forEach(key => {
-            if(!key.match(/^\d{4}-\d{2}$/)) return;
-            const monthData = window.appData[key];
-            if(!monthData.expenses) return;
-
-            Object.keys(monthData.expenses).forEach(day => {
-                const parts = key.split('-');
-                const itemDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(day));
-                if (itemDate >= today) {
-                    delete monthData.expenses[day]; 
+            // Remove from Pending DB
+            pendingIndicesToRemove.forEach(idx => {
+                if(idx > -1 && idx < window.appData.pending.length) {
+                    window.appData.pending.splice(idx, 1);
                 }
             });
-        });
 
-        // 3. Commit Temp Queue to Calendar using the pre-calculated projection
-        // We re-run the simulation logic to be safe and get the exact date again
-        let simulatedExpenses = [];
-        
-        window.tempQueue.forEach(item => {
-            let placed = false;
-            let safety = 0;
-            let dateCursor = new Date(today);
+            // 2. Clear Future Calendar
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            Object.keys(window.appData).forEach(key => {
+                if(!key.match(/^\d{4}-\d{2}$/)) return;
+                const monthData = window.appData[key];
+                if(!monthData.expenses) return;
 
-            while (!placed && safety < 365) {
-                const safe = window.isSafeToSpend(item.amount, dateCursor, simulatedExpenses);
-                if (safe) {
-                    const mKey = window.getMonthKey(dateCursor);
-                    const day = dateCursor.getDate();
-                    
-                    if(!window.appData[mKey]) window.appData[mKey] = { expenses: {} };
-                    if(!window.appData[mKey].expenses) window.appData[mKey].expenses = {};
-                    if(!window.appData[mKey].expenses[day]) window.appData[mKey].expenses[day] = [];
-                    
-                    // Create clean item (remove temp props)
-                    const cleanItem = {
-                        amount: item.amount,
-                        desc: item.desc,
-                        link: item.link || '',
-                        icon: item.icon || '💸',
-                        addedAt: new Date().toISOString()
-                    };
+                Object.keys(monthData.expenses).forEach(day => {
+                    const parts = key.split('-');
+                    const itemDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(day));
+                    if (itemDate >= today) {
+                        delete monthData.expenses[day]; 
+                    }
+                });
+            });
 
-                    window.appData[mKey].expenses[day].push(cleanItem);
-                    simulatedExpenses.push({ monthKey: mKey, day: day, amount: item.amount });
-                    placed = true;
-                } else {
-                    dateCursor.setDate(dateCursor.getDate() + 1);
+            // 3. Commit Temp Queue
+            let simulatedExpenses = [];
+            
+            window.tempQueue.forEach(item => {
+                let placed = false;
+                let safety = 0;
+                let dateCursor = new Date(today);
+
+                while (!placed && safety < 365) {
+                    const safe = window.isSafeToSpend(item.amount, dateCursor, simulatedExpenses);
+                    if (safe) {
+                        const mKey = window.getMonthKey(dateCursor);
+                        const day = dateCursor.getDate();
+                        
+                        if(!window.appData[mKey]) window.appData[mKey] = { expenses: {} };
+                        if(!window.appData[mKey].expenses) window.appData[mKey].expenses = {};
+                        if(!window.appData[mKey].expenses[day]) window.appData[mKey].expenses[day] = [];
+                        
+                        const cleanItem = {
+                            amount: item.amount,
+                            desc: item.desc,
+                            link: item.link || '',
+                            icon: item.icon || '💸',
+                            addedAt: new Date().toISOString()
+                        };
+
+                        window.appData[mKey].expenses[day].push(cleanItem);
+                        simulatedExpenses.push({ monthKey: mKey, day: day, amount: item.amount });
+                        placed = true;
+                    } else {
+                        dateCursor.setDate(dateCursor.getDate() + 1);
+                    }
+                    safety++;
                 }
-                safety++;
-            }
-        });
+            });
 
-        window.saveToCloud();
-        window.closeQueueModal();
-        window.renderCalendar();
-        window.renderPendingList(); // Pending items removed
-        window.showToast("Schedule updated!", "success");
+            window.saveToCloud();
+            window.closeQueueModal();
+            window.renderCalendar();
+            window.renderPendingList(); 
+            window.showToast("Schedule updated!", "success");
+        });
     };
 
     // --- UNSCHEDULED EXPENSES LOGIC ---
@@ -1250,11 +1309,11 @@
     };
 
     window.deletePending = (idx) => {
-        if(confirm("Delete this unscheduled expense?")) {
+        window.showCustomConfirm("Delete this unscheduled expense?", () => {
             if(idx === window.editingPendingIndex) window.cancelPendingEdit();
             window.appData.pending.splice(idx, 1);
             window.saveToCloud();
-        }
+        });
     };
 
     window.commitPending = (idx, dateString) => {
@@ -1288,11 +1347,15 @@
         window.showToast("Scheduled!", "success");
     };
 
+    // --- Updated Smart Scheduler Logic (Lookahead) ---
     window.findNextAffordableDate = (amount) => {
         const today = new Date();
+        // Look ahead 1 year
         for(let i=0; i<365; i++) {
             const checkDate = new Date();
             checkDate.setDate(today.getDate() + i);
+            
+            // USE THE NEW SAFE CHECK
             if(window.isSafeToSpend(amount, checkDate)) {
                 return checkDate;
             }
@@ -1300,7 +1363,7 @@
         return null;
     };
 
-    // --- CALENDAR RENDER ---
+   // --- CALENDAR RENDER (With "Look-Ahead" True Availability) ---
     window.renderCalendar = () => {
         const grid = document.getElementById('calendarGrid');
         grid.innerHTML = '';
@@ -1311,6 +1374,7 @@
         document.getElementById('currentMonthLabel').textContent = window.currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
         const currentBudget = window.getBudgetForDate(window.currentDate);
+        // Only update input if not focused
         if(document.activeElement !== document.getElementById('budgetInput')) {
             document.getElementById('budgetInput').value = currentBudget || '';
         }
@@ -1326,11 +1390,12 @@
         const monthKey = window.getMonthKey(window.currentDate);
         const expensesMap = (window.appData[monthKey] && window.appData[monthKey].expenses) ? window.appData[monthKey].expenses : {};
         
-        const rawBalances = [];  
-        const safeBalances = [];
+        const rawBalances = [];  // Technical balance on that specific day
+        const safeBalances = []; // The "True Available" (lowest future dip)
         
         let tempRunningSpent = 0;
 
+        // 1. Calculate Raw Balances (Standard)
         for(let d=1; d<=daysInMonth; d++) {
             const dayExpenses = expensesMap[d] || [];
             const dayCost = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
@@ -1340,13 +1405,14 @@
             rawBalances[d] = accrued - tempRunningSpent;
         }
 
+        // 2. Calculate Safe Balances (Look-Ahead / Backwards Ripple)
         let minFuture = Infinity;
         for(let d=daysInMonth; d>=1; d--) {
             if(rawBalances[d] < minFuture) minFuture = rawBalances[d];
             safeBalances[d] = minFuture;
         }
         
-        // --- MONTH SUMMARY ---
+        // --- STEP 1.5: UPDATE MONTH SUMMARY ---
         const totalScheduled = tempRunningSpent;
         const totalBudgetVal = currentBudget || 0;
         const remainingMonth = totalBudgetVal - totalScheduled;
@@ -1369,7 +1435,7 @@
             summaryDiv.innerHTML = "Set a budget above to see monthly progress.";
         }
 
-        // --- RENDER GRID ---
+        // --- STEP 2: RENDER GRID ---
         for(let i=0; i<firstDayOfMonth; i++) {
             const d = document.createElement('div');
             d.className = 'day-cell empty';
@@ -1616,19 +1682,20 @@
     };
 
     window.deleteExpense = (idx) => {
-        if(!confirm("Remove this item?")) return;
-        const monthKey = window.getMonthKey(window.selectedDate);
-        const day = window.selectedDate.getDate();
-        window.appData[monthKey].expenses[day].splice(idx, 1);
-        window.saveToCloud();
-        if(idx === window.editingExpenseIndex) {
-            window.editingExpenseIndex = -1;
-            document.getElementById('modalSaveBtn').textContent = "Save Item";
-            document.getElementById('expenseAmount').value = '';
-        }
-        window.renderModalList();
-        window.renderCalendar();
-        window.showToast("Deleted", "success");
+        window.showCustomConfirm("Remove this item?", () => {
+            const monthKey = window.getMonthKey(window.selectedDate);
+            const day = window.selectedDate.getDate();
+            window.appData[monthKey].expenses[day].splice(idx, 1);
+            window.saveToCloud();
+            if(idx === window.editingExpenseIndex) {
+                window.editingExpenseIndex = -1;
+                document.getElementById('modalSaveBtn').textContent = "Save Item";
+                document.getElementById('expenseAmount').value = '';
+            }
+            window.renderModalList();
+            window.renderCalendar();
+            window.showToast("Deleted", "success");
+        });
     };
 
     window.closeModal = () => {
