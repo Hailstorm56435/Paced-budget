@@ -725,17 +725,23 @@
     };
 
 
-    // --- ADVANCED SOLVENCY CHECK ---
+   // --- ADVANCED SOLVENCY CHECK ---
     // This function checks if adding 'amount' on 'checkDate' keeps the budget positive 
     // for checkDate AND ALL SUBSEQUENT DAYS in the month.
     window.isSafeToSpend = (amount, checkDate, tempAddedExpenses = []) => {
         const monthlyBudget = window.getBudgetForDate(checkDate);
-        if (monthlyBudget <= 0) return true; // No budget = no rules
+        
+        // FIX: Removed the "if (monthlyBudget <= 0) return true;" check.
+        // Now, if the budget is 0, the dailyRate is 0, and any spending 
+        // will immediately trigger a negative balance, forcing the 
+        // scheduler to look for a future month with funds.
 
         const y = checkDate.getFullYear();
         const m = checkDate.getMonth();
         const daysInMonth = new Date(y, m+1, 0).getDate();
-        const dailyRate = monthlyBudget / daysInMonth;
+        
+        // If budget is 0, rate is 0. This is correct behavior.
+        const dailyRate = monthlyBudget / daysInMonth; 
         const mKey = window.getMonthKey(checkDate);
 
         // Calculate baseline expenses per day from existing appData
@@ -761,16 +767,13 @@
         dailyExpenses[checkDate.getDate()] += amount;
 
         // Verify Balance from Day 1 to End of Month
-        // We only need to check starting from the day we are adding money, 
-        // but checking whole month is safer to ensure integrity.
         let runningSpent = 0;
         for(let d = 1; d <= daysInMonth; d++) {
             runningSpent += dailyExpenses[d];
             const accrued = dailyRate * d;
             const balance = accrued - runningSpent;
             
-            // If balance drops below zero on ANY day (including or after our target date), it's unsafe.
-            // (We allow small floating point error -0.01)
+            // If balance drops below zero on ANY day, it's unsafe.
             if (balance < -0.01) return false;
         }
 
