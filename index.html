@@ -14,7 +14,6 @@
     <style>
         :root {
             --primary: #2563eb;
-            --primary-dark: #1e40af;
             --success: #16a34a;
             --danger: #dc2626;
             --warning: #f59e0b;
@@ -106,6 +105,9 @@
             background: #f1f5f9; color: var(--text-main); font-weight: 500; 
             font-size: 0.8rem; padding: 5px 10px; border: 1px solid var(--border);
         }
+
+        /* SVG Icon styling */
+        .icon-svg { width: 18px; height: 18px; fill: currentColor; }
 
         input[type="text"], input[type="number"], input[type="email"], input[type="password"], input[type="url"], input[type="date"] {
             padding: 10px; border: 1px solid var(--border); border-radius: 8px;
@@ -1013,6 +1015,14 @@
         today.setHours(0,0,0,0);
         let dateCursor = new Date(today);
         let simulatedExpenses = []; 
+        
+        // Prepare Ignored List (Fixed Obstacles = Items currently in queue from Calendar)
+        const ignoredSignatureSet = new Set();
+        window.tempQueue.forEach(item => {
+            if(item.sourceType === 'calendar') {
+                ignoredSignatureSet.add(`${item.originalDate.getTime()}-${item.originalDayIndex}`);
+            }
+        });
 
         window.tempQueue.forEach(item => {
             let placed = false;
@@ -1020,7 +1030,7 @@
             dateCursor = new Date(today);
 
             while (!placed && safety < 365) {
-                const safe = window.isSafeToSpend(item.amount, dateCursor, simulatedExpenses);
+                const safe = window.isSafeToSpend(item.amount, dateCursor, simulatedExpenses, ignoredSignatureSet);
                 if (safe) {
                     item._projectedDate = new Date(dateCursor); 
                     const mKey = window.getMonthKey(dateCursor);
@@ -1096,7 +1106,7 @@
 
     // --- UNSCHEDULE ALL ---
     window.unscheduleAll = () => {
-        window.showCustomConfirm("Unschedule ALL future calendar items and move them to Inbox?", () => {
+        window.showCustomConfirm("Unschedule ALL future calendar items and move them to Unscheduled?", () => {
             const today = new Date();
             today.setHours(0,0,0,0);
             
@@ -1125,12 +1135,12 @@
             window.saveToCloud();
             window.renderCalendar();
             window.renderPendingList(); // Update Inbox count
-            window.showToast("All items moved to Inbox", "success");
+            window.showToast("All items moved to Unscheduled", "success");
         });
     }
 
     // --- SOLVENCY CHECK ---
-    window.isSafeToSpend = (amount, checkDate, tempAddedExpenses = []) => {
+    window.isSafeToSpend = (amount, checkDate, tempAddedExpenses = [], ignoredSignatureSet = null) => {
         const monthlyBudget = window.getBudgetForDate(checkDate);
         
         const y = checkDate.getFullYear();
@@ -1144,18 +1154,24 @@
 
         const dailyExpenses = new Array(daysInMonth + 1).fill(0);
 
-        // 1. Load History (Past items only)
+        // 1. Load Existing Calendar Items (Skipping ignored ones)
         if(window.appData[mKey] && window.appData[mKey].expenses) {
             Object.keys(window.appData[mKey].expenses).forEach(dStr => {
                 const day = parseInt(dStr);
                 const itemDate = new Date(y, m, day);
                 
-                // Only include if it is in the past
-                if (itemDate < today) {
-                    window.appData[mKey].expenses[dStr].forEach(e => {
-                        dailyExpenses[day] += e.amount;
-                    });
-                }
+                // Only look at dates from today onwards for conflicts?
+                // Actually we need to load ALL history to get the balance right.
+                // But we only IGNORE items if they are >= today (since queue only pulls >= today)
+                
+                window.appData[mKey].expenses[dStr].forEach((e, idx) => {
+                    // Check Ignore List
+                    if(ignoredSignatureSet) {
+                        const sig = `${itemDate.getTime()}-${idx}`;
+                        if(ignoredSignatureSet.has(sig)) return; // Skip this item, it's being moved
+                    }
+                    dailyExpenses[day] += e.amount;
+                });
             });
         }
 
@@ -1206,21 +1222,45 @@
             });
 
             // B. Remove Calendar Items from DB 
-            Object.keys(window.appData).forEach(key => {
-                if(!key.match(/^\d{4}-\d{2}$/)) return;
-                const monthData = window.appData[key];
-                if(!monthData.expenses) return;
+            // We must do this carefully. Since arrays shift when we splice, we must process in reverse order per day.
+            // First, group removals by Day.
+            const calendarRemovals = {}; // Key: "YYYY-MM-DD", Value: [indices]
+            
+            window.tempQueue.forEach(item => {
+                if(item.sourceType === 'calendar') {
+                    const dateKey = window.getMonthKey(item.originalDate) + '-' + item.originalDate.getDate();
+                    if(!calendarRemovals[dateKey]) calendarRemovals[dateKey] = [];
+                    calendarRemovals[dateKey].push(item.originalDayIndex);
+                }
+            });
 
-                Object.keys(monthData.expenses).forEach(day => {
-                    const parts = key.split('-');
-                    const itemDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(day));
-                    if (itemDate >= today) {
-                        delete monthData.expenses[day]; 
+            // Now execute removals day by day, sorting indices descending
+            Object.keys(calendarRemovals).forEach(dateKey => {
+                // Parse key back to access appData
+                // dateKey format: "2024-01-15"
+                const parts = dateKey.split('-');
+                const mKey = `${parts[0]}-${parts[1]}`;
+                const day = parseInt(parts[2]);
+                
+                if(window.appData[mKey] && window.appData[mKey].expenses[day]) {
+                    const indices = calendarRemovals[dateKey].sort((a,b) => b - a);
+                    indices.forEach(idx => {
+                        if(window.appData[mKey].expenses[day][idx]) {
+                            window.appData[mKey].expenses[day].splice(idx, 1);
+                        }
+                    });
+                    // Cleanup empty days
+                    if(window.appData[mKey].expenses[day].length === 0) {
+                        delete window.appData[mKey].expenses[day];
                     }
-                });
+                }
             });
 
             // 3. Commit Temp Queue
+            // We re-run the simulation logic to be safe and get the exact date again
+            // NOTE: The `isSafeToSpend` logic must now run against the CLEARED appData
+            // So we don't pass an ignoreSet anymore, because we literally just deleted them.
+            
             let simulatedExpenses = [];
             
             window.tempQueue.forEach(item => {
