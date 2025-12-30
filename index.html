@@ -163,29 +163,114 @@
             padding: 4px; font-size: 0.8rem; width: 110px; border: 1px solid #ccc;
         }
 
-        /* --- CALENDAR GRID --- */
+        /* --- CALENDAR GRID (FIXED) --- */
         .calendar-header {
             display: grid; grid-template-columns: repeat(7, 1fr); text-align: center;
             font-weight: bold; color: var(--text-sub); margin-bottom: 8px; font-size: 0.85rem;
         }
 
         .calendar-grid {
-            display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
+            display: grid; 
+            grid-template-columns: repeat(7, 1fr); 
+            gap: 1px;
             background-color: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
         }
 
         .day-cell {
-            background-color: var(--surface); min-height: 110px; padding: 8px;
-            display: flex; flex-direction: column; cursor: pointer;
+            background-color: var(--surface); 
+            padding: 4px; 
+            position: relative; 
+            cursor: pointer;
+            display: flex; 
+            flex-direction: column;
+            transition: background 0.2s;
+            
+            /* STRICT SIZING (Desktop Default) */
+            height: 120px; 
+            overflow: hidden; 
         }
+
         .day-cell:hover { background-color: #f8fafc; }
         .day-cell.today { background-color: #eff6ff; }
+        .day-cell.empty { background-color: #f8fafc; cursor: default; }
         .day-cell.hidden-mobile { display: flex; }
-        
-        .date-number { font-weight: 700; display: flex; justify-content: space-between; margin-bottom: 5px; }
+
+        .date-number { font-weight: 700; display: flex; justify-content: space-between; margin-bottom: 2px; font-size:0.9rem; }
         .day-weekday { display: none; }
+
+        /* The container that holds the list of expenses */
+        .expense-chips { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 2px; 
+            flex: 1; /* Take up remaining vertical space */
+            overflow-y: auto; /* Scroll internally if too many items */
+            min-height: 0;
+            
+            /* Thin scrollbar styling */
+            scrollbar-width: thin; 
+            scrollbar-color: #cbd5e1 transparent;
+        }
+        .expense-chips::-webkit-scrollbar { width: 3px; }
+        .expense-chips::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
+
+        /* The individual item pill */
+        .expense-chip { 
+            font-size: 0.75rem; 
+            color: var(--text-sub); 
+            background: #f1f5f9; 
+            padding: 2px 6px; 
+            border-radius: 4px;
+            
+            /* TEXT TRUNCATION MAGIC */
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            display: block; 
+            max-width: 100%;
+        }
         
-        .expense-chips { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; }
+        .chip-desc-text { opacity: 0.8; margin-left: 4px; font-weight: normal; }
+
+        .balance-indicator { font-size: 0.8rem; font-weight: 700; text-align: right; margin-top: auto; padding-top:2px; }
+        .bal-pos { color: var(--success); }
+        .bal-neg { color: var(--danger); }
+
+        /* --- MOBILE OVERRIDES --- */
+        @media (max-width: 600px) {
+            .calendar-header { display: none; }
+            .calendar-grid { display: flex; flex-direction: column; gap: 0; border: none; background: transparent; }
+            
+            .day-cell {
+                min-height: 70px; 
+                height: auto; /* Allow growing on mobile */
+                border-bottom: 1px solid var(--border);
+                flex-direction: row; align-items: center; padding: 10px 5px;
+                overflow: visible;
+            }
+            .day-cell.empty { display: none; }
+            .day-cell.hidden-mobile { display: none !important; }
+
+            .date-number {
+                flex-direction: column-reverse; align-items: center; justify-content: center;
+                width: 50px; min-width: 50px; margin-bottom: 0; background: #f1f5f9;
+                border-radius: 8px; padding: 6px 0; margin-right: 12px; height: 44px;
+            }
+            .day-weekday { display: block; font-size: 0.65rem; text-transform: uppercase; color: var(--text-sub); line-height: 1; }
+            .day-cell.today .date-number { background: var(--primary); color: white; }
+            .day-cell.today .day-weekday { color: rgba(255,255,255,0.8); }
+
+            .expense-chips { 
+                flex-direction: row; flex-wrap: wrap; gap: 6px; align-content: center; 
+                overflow-y: visible; /* Show full content */
+            }
+            .expense-chip { 
+                background: #f1f5f9; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; 
+                max-width: none; /* Allow full width text on mobile */
+            }
+            
+            .balance-indicator { margin-top: 0; font-size: 0.95rem; min-width: 70px; }
+        }
         
         /* Updated Chip Style: Truncation logic */
         .expense-chip { 
@@ -1440,7 +1525,7 @@
         return null;
     };
 
-   // --- CALENDAR RENDER (With "Look-Ahead" True Availability) ---
+// --- CALENDAR RENDER (Fixed Layout) ---
     window.renderCalendar = () => {
         const grid = document.getElementById('calendarGrid');
         grid.innerHTML = '';
@@ -1451,7 +1536,6 @@
         document.getElementById('currentMonthLabel').textContent = window.currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
         const currentBudget = window.getBudgetForDate(window.currentDate);
-        // Only update input if not focused
         if(document.activeElement !== document.getElementById('budgetInput')) {
             document.getElementById('budgetInput').value = currentBudget || '';
         }
@@ -1463,33 +1547,29 @@
         const today = new Date();
         const isCurrentMonth = (today.getFullYear() === y && today.getMonth() === m);
 
-        // --- STEP 1: PRE-CALCULATE BALANCES ---
+        // --- PRE-CALCULATE BALANCES ---
         const monthKey = window.getMonthKey(window.currentDate);
         const expensesMap = (window.appData[monthKey] && window.appData[monthKey].expenses) ? window.appData[monthKey].expenses : {};
         
-        const rawBalances = [];  // Technical balance on that specific day
-        const safeBalances = []; // The "True Available" (lowest future dip)
-        
+        const rawBalances = [];
+        const safeBalances = [];
         let tempRunningSpent = 0;
 
-        // 1. Calculate Raw Balances (Standard)
         for(let d=1; d<=daysInMonth; d++) {
             const dayExpenses = expensesMap[d] || [];
             const dayCost = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
             tempRunningSpent += dayCost;
-            
             const accrued = dailyRate * d;
             rawBalances[d] = accrued - tempRunningSpent;
         }
 
-        // 2. Calculate Safe Balances (Look-Ahead / Backwards Ripple)
         let minFuture = Infinity;
         for(let d=daysInMonth; d>=1; d--) {
             if(rawBalances[d] < minFuture) minFuture = rawBalances[d];
             safeBalances[d] = minFuture;
         }
         
-        // --- STEP 1.5: UPDATE MONTH SUMMARY ---
+        // --- UPDATE SUMMARY ---
         const totalScheduled = tempRunningSpent;
         const totalBudgetVal = currentBudget || 0;
         const remainingMonth = totalBudgetVal - totalScheduled;
@@ -1498,21 +1578,21 @@
         if(totalBudgetVal > 0) {
             summaryDiv.innerHTML = `
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span>Spent/Scheduled: <strong>$${totalScheduled.toFixed(0)}</strong></span>
+                    <span>Spent: <strong>$${totalScheduled.toFixed(0)}</strong></span>
                     <span>Budget: <strong>$${totalBudgetVal.toFixed(0)}</strong></span>
                 </div>
                 <div style="width:100%; background:#e2e8f0; height:6px; border-radius:3px; overflow:hidden;">
                     <div style="width:${Math.min((totalScheduled/totalBudgetVal)*100, 100)}%; background:${remainingMonth >= 0 ? 'var(--primary)' : 'var(--danger)'}; height:100%;"></div>
                 </div>
                 <div style="text-align:right; font-size:0.75rem; color:${remainingMonth >= 0 ? 'var(--success)' : 'var(--danger)'}; margin-top:2px;">
-                    ${remainingMonth >= 0 ? 'Remaining Capacity: $' + remainingMonth.toFixed(0) : 'Over Budget: $' + Math.abs(remainingMonth).toFixed(0)}
+                    ${remainingMonth >= 0 ? 'Remaining: $' + remainingMonth.toFixed(0) : 'Over: $' + Math.abs(remainingMonth).toFixed(0)}
                 </div>
             `;
         } else {
             summaryDiv.innerHTML = "Set a budget above to see monthly progress.";
         }
 
-        // --- STEP 2: RENDER GRID ---
+        // --- RENDER GRID ---
         for(let i=0; i<firstDayOfMonth; i++) {
             const d = document.createElement('div');
             d.className = 'day-cell empty';
@@ -1539,12 +1619,14 @@
 
             const dayExpenses = expensesMap[day] || [];
             const balance = safeBalances[day];
+            
             const dayName = dateObj.toLocaleDateString('en-US', {weekday:'short'});
 
             let chipsHtml = '';
             dayExpenses.forEach(exp => {
-                chipsHtml += `<div class="expense-chip" title="${exp.desc}">
-                    ${exp.icon || '💸'} $${exp.amount.toFixed(0)} <span class="chip-desc-text">${exp.desc}</span>
+                const desc = exp.desc || 'Item';
+                chipsHtml += `<div class="expense-chip" title="${desc} - $${exp.amount.toFixed(2)}">
+                    ${exp.icon || '💸'} $${exp.amount.toFixed(0)} <span class="chip-desc-text">${desc}</span>
                 </div>`;
             });
 
