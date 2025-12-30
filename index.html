@@ -277,8 +277,12 @@
             display: flex; gap: 10px; align-items: center; background: #fff; border: 1px solid #e2e8f0;
             margin-bottom: 8px; padding: 10px; border-radius: 8px;
         }
+        .queue-item.unscheduled { border-left: 4px solid var(--warning); }
+        
         .queue-details { flex-grow: 1; }
-        .queue-cost { font-weight: bold; }
+        .queue-cost { font-weight: bold; text-align:right;}
+        .queue-projection { font-size:0.75rem; color:var(--success); font-weight:600; display:block; margin-top:2px; }
+        
         .queue-controls { display: flex; flex-direction: column; gap: 2px; }
         .queue-arrow { 
             border: 1px solid #ddd; background: #f8fafc; width: 24px; height: 24px; 
@@ -467,7 +471,7 @@
             <h4 style="margin:0 0 5px 0;">Email Notifications</h4>
             <p style="font-size:0.8rem; color:var(--text-sub); background:#eef2ff; padding:10px; border-radius:8px; line-height:1.4;">
                 <strong>Note:</strong> Emails in this list will receive a report of items 
-                scheduled for purchase that specific day. You will receive max one email per day, only if there are active expenses.
+                scheduled for purchase that specific day.
             </p>
 
             <div style="display:flex; gap:5px; margin-bottom:10px; margin-top:10px;">
@@ -492,9 +496,15 @@
 
 <div class="modal" id="queueModal">
     <div class="modal-content">
-        <h3 style="margin-top:0;">📋 Upcoming Queue</h3>
-        <p style="font-size:0.85rem; color:var(--text-sub); margin-top:-10px; margin-bottom:15px;">
-            These are all scheduled expenses from today onwards. Reorder them by priority, then click Auto-Schedule to fit them into your <strong>monthly</strong> budget automatically.
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h3 style="margin:0;">📋 Upcoming Queue</h3>
+            <label class="checkbox-wrapper" style="font-size:0.85rem; background:#f1f5f9; padding:5px 10px; border-radius:12px;">
+                <input type="checkbox" id="includePendingInQueue" onchange="window.openQueueModal()"> Include Unscheduled
+            </label>
+        </div>
+        
+        <p style="font-size:0.85rem; color:var(--text-sub); margin-top:-5px; margin-bottom:15px;">
+            Reorder items by priority. "Est" shows when the budget permits purchase.
         </p>
 
         <div id="queueContainer" style="background:#f8fafc; border:1px solid #eee; border-radius:8px; padding:10px; max-height:300px; overflow-y:auto; margin-bottom:15px;">
@@ -515,43 +525,26 @@
         </div>
         
         <div style="line-height:1.5; color:var(--text-main); font-size:0.9rem; overflow-y:auto;">
-            
             <h4 style="margin:0 0 5px 0; color:var(--primary);">1. The Goal: Fixing "Front-Loading"</h4>
             <p style="margin-top:0; color:var(--text-sub);">
-                The primary cause of budget failure is "front-loading": seeing a full bank account at the start of the month, feeling wealthy, and overspending immediately. This leaves you with zero (or negative) funds for the final week of the month.
-            </p>
-            <p style="color:var(--text-sub);">
-                PaceBudget solves this by treating your monthly budget as a <strong>daily wage</strong>. If your budget is $300, you do not have $300 today. You have $10 today, another $10 tomorrow, etc. You must wait to "accrue" the funds before spending them.
+                The primary cause of budget failure is "front-loading": spending too much at the start of the month.
+                PaceBudget treats your monthly budget as a <strong>daily wage</strong>. If your budget is $300, you have $10 today. You must wait to "accrue" funds.
             </p>
 
-            <h4 style="margin:20px 0 5px 0; color:var(--primary);">2. Intended Use: Discretionary Spending Only</h4>
+            <h4 style="margin:20px 0 5px 0; color:var(--primary);">2. Intended Use: Discretionary Only</h4>
             <p style="margin-top:0; color:var(--text-sub);">
-                <strong>Do not include fixed bills like Rent, Mortgage, or Insurance here.</strong>
-            </p>
-            <p style="color:var(--text-sub);">
-                This tool is intended for <strong>elastic (variable) expenses</strong>—things you have control over, like dining out, hobbies, groceries, or gadgets. 
-                <br><br>
-                <em>To use correctly:</em> Take your Total Income, subtract your Fixed Bills, and enter the <strong>remaining amount</strong> as your Budget at the top of the screen.
+                <strong>Do not include fixed bills like Rent here.</strong> This is for elastic expenses (dining, hobbies, gadgets).
             </p>
 
             <h4 style="margin:20px 0 5px 0; color:var(--primary);">3. The "Look-Ahead" Balance</h4>
             <p style="margin-top:0; color:var(--text-sub);">
-                The dollar amount shown on a specific day is not just the cash available that day. It is your <strong>Safe-to-Spend Balance</strong>.
-            </p>
-            <p style="color:var(--text-sub); background:#f8fafc; padding:10px; border-left:3px solid #cbd5e1;">
-                <strong>The Logic:</strong> If you have $50 today, but you have a scheduled expense of $45 scheduled for tomorrow, the calendar will show you have only <strong>$5</strong> available today. The system automatically reserves money for future plans to prevent you from accidentally "stealing" from your future self.
+                The dollar amount on a day is your <strong>Safe-to-Spend Balance</strong>. It looks ahead at future scheduled items and reserves cash for them automatically.
             </p>
 
             <h4 style="margin:20px 0 5px 0; color:var(--primary);">4. Smart Scheduling & The Queue</h4>
             <p style="margin-top:0; color:var(--text-sub);">
-                Because the system knows your daily accrual rate, it can mathematically determine the earliest date you can afford an item without going into the red.
+                Use the Queue to prioritize items. The AI calculates the earliest date you can afford an item without breaking your budget (going negative) on any future day.
             </p>
-            <ul style="margin-top:5px; padding-left:20px; color:var(--text-sub);">
-                <li style="margin-bottom:5px;"><strong>Unscheduled Expenses:</strong> Items you want to buy but haven't assigned a date to.</li>
-                <li style="margin-bottom:5px;"><strong>The Queue:</strong> A list of all planned spending. You can reorder them by priority.</li>
-                <li><strong>Auto-Schedule:</strong> The algorithm places your high-priority items on the earliest possible dates where they won't break your budget, pushing lower-priority items to later dates (or next month) automatically.</li>
-            </ul>
-
         </div>
         
         <div style="margin-top:20px; text-align:right; border-top:1px solid #eee; padding-top:15px;">
@@ -583,7 +576,6 @@
     let currentUser = null;
     let unsubscribe = null; 
 
-    // Initialize global immediately so UI doesn't crash on load
     window.appData = { pending: [], emailList: [], budgets: {}, displayName: '' };
 
     // --- AUTH ---
@@ -614,7 +606,6 @@
             document.getElementById('userDisplay').style.display = 'flex';
             document.getElementById('appContent').style.display = 'block';
             document.getElementById('loginPrompt').style.display = 'none';
-            // Set email in settings
             document.getElementById('currentUserEmailDisplay').textContent = user.email;
             startDataListener(user.uid);
         } else {
@@ -636,21 +627,19 @@
         const email2 = document.getElementById('confirmLoginEmail').value;
         
         if(!email1 || email1 !== email2) {
-            window.showToast("Email addresses do not match or are empty.", "error");
+            window.showToast("Email addresses do not match.", "error");
             return;
         }
         
-        if(!confirm("Are you sure you want to change your login email?")) return;
+        if(!confirm("Change login email?")) return;
 
         if(currentUser) {
             updateEmail(currentUser, email1).then(() => {
-                window.showToast("Email updated successfully!", "success");
+                window.showToast("Email updated!", "success");
                 document.getElementById('currentUserEmailDisplay').textContent = email1;
                 document.getElementById('newLoginEmail').value = '';
                 document.getElementById('confirmLoginEmail').value = '';
-            }).catch(err => {
-                window.showToast(err.message, "error");
-            });
+            }).catch(err => window.showToast(err.message, "error"));
         }
     };
 
@@ -659,20 +648,18 @@
         const pass2 = document.getElementById('confirmLoginPass').value;
         
         if(!pass1 || pass1 !== pass2) {
-            window.showToast("Passwords do not match or are empty.", "error");
+            window.showToast("Passwords do not match.", "error");
             return;
         }
         
-        if(!confirm("Are you sure you want to change your password?")) return;
+        if(!confirm("Change password?")) return;
 
         if(currentUser) {
             updatePassword(currentUser, pass1).then(() => {
-                window.showToast("Password updated successfully!", "success");
+                window.showToast("Password updated!", "success");
                 document.getElementById('newLoginPass').value = '';
                 document.getElementById('confirmLoginPass').value = '';
-            }).catch(err => {
-                window.showToast(err.message, "error");
-            });
+            }).catch(err => window.showToast(err.message, "error"));
         }
     }
 
@@ -683,7 +670,6 @@
                 if (!window.appData.pending) window.appData.pending = [];
                 if (!window.appData.emailList) window.appData.emailList = [];
                 if (!window.appData.budgets) {
-                    // Migration
                     if(window.appData.budget) {
                         const mKey = window.getMonthKey(new Date());
                         window.appData.budgets = {};
@@ -734,7 +720,6 @@
         if(document.getElementById('settingsModal').classList.contains('active')) {
             window.renderSettings();
         }
-        // Update header user name
         const name = window.appData.displayName || "Family";
         document.getElementById('headerUserName').textContent = name;
     }
@@ -748,18 +733,14 @@
     window.showHistory = false;
     window.editingPendingIndex = -1; 
     window.editingExpenseIndex = -1;
-    // Rescheduling state
     window.reschedulingIndex = -1; 
-    
-    // Temp storage for the queue tool
-    window.tempQueue = [];
+    window.tempQueue = []; // Unified queue for planning
 
     window.getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
 
     window.toggleHistory = () => {
         window.showHistory = !window.showHistory;
         window.renderCalendar();
-        // Update button text
         document.getElementById('historyBtn').textContent = window.showHistory ? "Hide previous days" : "Show previous days";
     };
 
@@ -773,40 +754,30 @@
         window.renderCalendar();
     };
 
-    // --- INDEPENDENT BUDGET LOGIC ---
     window.getBudgetForDate = (dateObj) => {
         if(!window.appData.budgets) return 0;
-        
-        // 1. Try exact month
         const key = window.getMonthKey(dateObj);
         if(window.appData.budgets[key] !== undefined) return window.appData.budgets[key];
-
-        // 2. Find most recent past budget
         const sortedKeys = Object.keys(window.appData.budgets).sort().reverse();
         for(let k of sortedKeys) {
             if(k < key) return window.appData.budgets[k];
         }
-
-        return 0; // No budget ever set
+        return 0; 
     };
 
     window.updateBudget = () => {
         const val = parseFloat(document.getElementById('budgetInput').value) || 0;
         const key = window.getMonthKey(window.currentDate);
-        
         if(!window.appData.budgets) window.appData.budgets = {};
         window.appData.budgets[key] = val;
-        
         window.saveToCloud();
         window.renderCalendar();
     };
 
-    // --- VALIDATOR FOR EXPENSE SIZE ---
     window.checkExpenseLimit = (amount, dateContext) => {
         const budget = window.getBudgetForDate(dateContext);
         if(budget <= 0) return true;
-        
-        const limit = budget / 2; // 50% Cap
+        const limit = budget / 2; 
         if (amount > limit) {
             window.showToast(`⚠️ Limit Reached: Max $${limit.toFixed(0)}`, "warning");
             return false;
@@ -815,7 +786,6 @@
     }
 
     // --- SETTINGS ---
-    
     window.openSettings = () => {
         document.getElementById('settingsModal').classList.add('active');
         window.renderSettings();
@@ -838,7 +808,6 @@
         const newName = document.getElementById('userNameInput').value;
         window.appData.displayName = newName;
         window.saveToCloud();
-        // Update header immediately
         document.getElementById('headerUserName').textContent = newName || "Family";
     };
 
@@ -858,7 +827,7 @@
         window.saveToCloud();
         window.renderSettings();
     };
-    // --- HELP MODAL ---
+    
     window.openHelp = () => document.getElementById('helpModal').classList.add('active');
     window.closeHelp = () => document.getElementById('helpModal').classList.remove('active');
 
@@ -868,6 +837,7 @@
         const today = new Date();
         today.setHours(0,0,0,0);
         
+        // 1. Get Scheduled Future Items
         Object.keys(window.appData).forEach(key => {
             if(!key.match(/^\d{4}-\d{2}$/)) return;
             const monthData = window.appData[key];
@@ -879,41 +849,119 @@
                 
                 if (itemDate >= today) {
                     monthData.expenses[day].forEach(exp => {
-                        window.tempQueue.push({ ...exp, originalDate: itemDate });
+                        window.tempQueue.push({ 
+                            ...exp, 
+                            sourceType: 'calendar', 
+                            originalDate: itemDate 
+                        });
                     });
                 }
             });
         });
 
-        // Sort by date initially
-        window.tempQueue.sort((a,b) => a.originalDate - b.originalDate);
+        // 2. Add Pending Items if checked
+        const includePending = document.getElementById('includePendingInQueue').checked;
+        if (includePending && window.appData.pending) {
+            window.appData.pending.forEach((item, idx) => {
+                window.tempQueue.push({
+                    ...item,
+                    sourceType: 'pending',
+                    originalIndex: idx // Track index to remove later
+                });
+            });
+        }
+
+        // Sort: Calendar items by date, then Pending items
+        window.tempQueue.sort((a,b) => {
+            // If both calendar, sort by date
+            if(a.sourceType === 'calendar' && b.sourceType === 'calendar') return a.originalDate - b.originalDate;
+            // If one is pending, push to end (initially)
+            if(a.sourceType === 'pending' && b.sourceType === 'calendar') return 1;
+            if(a.sourceType === 'calendar' && b.sourceType === 'pending') return -1;
+            return 0;
+        });
+
         window.renderQueueList();
         document.getElementById('queueModal').classList.add('active');
     };
 
     window.closeQueueModal = () => document.getElementById('queueModal').classList.remove('active');
 
+    window.removeFromQueue = (idx) => {
+        // Just removes from tempQueue, doesn't delete from DB
+        window.tempQueue.splice(idx, 1);
+        window.renderQueueList();
+    };
+
     window.renderQueueList = () => {
         const c = document.getElementById('queueContainer');
         c.innerHTML = '';
+        
+        // --- REAL TIME SIMULATION ---
+        // Calculate projected dates for the current tempQueue order
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        let dateCursor = new Date(today);
+        let simulatedExpenses = []; // To track accumulation during this simulation
+
+        window.tempQueue.forEach(item => {
+            let placed = false;
+            let safety = 0;
+            // Always try to pack from today onwards
+            dateCursor = new Date(today);
+
+            while (!placed && safety < 365) {
+                // Check safety against "clean slate" future + simulated items
+                const safe = window.isSafeToSpend(item.amount, dateCursor, simulatedExpenses);
+                if (safe) {
+                    item._projectedDate = new Date(dateCursor); // Store for display
+                    
+                    const mKey = window.getMonthKey(dateCursor);
+                    simulatedExpenses.push({ 
+                        monthKey: mKey, 
+                        day: dateCursor.getDate(), 
+                        amount: item.amount 
+                    });
+                    placed = true;
+                } else {
+                    dateCursor.setDate(dateCursor.getDate() + 1);
+                }
+                safety++;
+            }
+        });
+        // -----------------------------
+
         if (window.tempQueue.length === 0) {
-            c.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No upcoming scheduled expenses found.</div>';
+            c.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Queue is empty.</div>';
             return;
         }
 
         window.tempQueue.forEach((item, idx) => {
             const div = document.createElement('div');
-            div.className = 'queue-item';
+            div.className = 'queue-item' + (item.sourceType === 'pending' ? ' unscheduled' : '');
+            
+            let dateDisplay = item._projectedDate 
+                ? `👉 Est: ${item._projectedDate.toLocaleDateString('en-US', {month:'short', day:'numeric'})}`
+                : `<span style="color:red">Budget Tight</span>`;
+
+            // Unscheduled items get a remove 'x' button
+            let removeBtn = item.sourceType === 'pending' 
+                ? `<button class="btn-text" style="color:#aaa; font-size:1.2rem; line-height:1;" onclick="removeFromQueue(${idx})">×</button>`
+                : '';
+
             div.innerHTML = `
                 <div class="queue-controls">
                     <div class="queue-arrow" onclick="moveQueueItem(${idx}, -1)">▲</div>
                     <div class="queue-arrow" onclick="moveQueueItem(${idx}, 1)">▼</div>
                 </div>
                 <div class="queue-details">
-                    <div>${item.desc}</div>
-                    <div style="font-size:0.75rem; color:#888;">Currently: ${item.originalDate.toLocaleDateString()}</div>
+                    <div>${item.desc} ${item.sourceType === 'pending' ? '<span style="font-size:0.7rem; background:#fef3c7; padding:1px 4px; border-radius:4px;">New</span>' : ''}</div>
+                    <div class="queue-projection">${dateDisplay}</div>
                 </div>
-                <div class="queue-cost">$${item.amount.toFixed(0)}</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div class="queue-cost">$${item.amount.toFixed(0)}</div>
+                    ${removeBtn}
+                </div>
             `;
             c.appendChild(div);
         });
@@ -930,63 +978,93 @@
         window.renderQueueList();
     };
 
-
-   // --- ADVANCED SOLVENCY CHECK ---
-    // This function checks if adding 'amount' on 'checkDate' keeps the budget positive 
-    // for checkDate AND ALL SUBSEQUENT DAYS in the month.
+    // --- SOLVENCY CHECK ---
     window.isSafeToSpend = (amount, checkDate, tempAddedExpenses = []) => {
         const monthlyBudget = window.getBudgetForDate(checkDate);
         
         const y = checkDate.getFullYear();
         const m = checkDate.getMonth();
         const daysInMonth = new Date(y, m+1, 0).getDate();
-        
-        // If budget is 0, rate is 0. This is correct behavior.
         const dailyRate = monthlyBudget / daysInMonth; 
         const mKey = window.getMonthKey(checkDate);
 
-        // Calculate baseline expenses per day from existing appData
+        // We want to simulate a "Clean Slate" future for the days we are overwriting.
+        // HOWEVER, `appData` currently contains the old scheduled items. 
+        // If we use `appData` directly, we are double-counting.
+        // Strategy: We will calculate the base balance assuming *ZERO* scheduled expenses 
+        // for dates >= Today, and only add back the `tempAddedExpenses`.
+        
+        // NOTE: This logic assumes we are wiping ALL future expenses.
+        // So for any day D >= Today, existing appData expenses should be IGNORED.
+        // For day D < Today, we keep history.
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
         const dailyExpenses = new Array(daysInMonth + 1).fill(0);
 
+        // 1. Load History (Past items only)
         if(window.appData[mKey] && window.appData[mKey].expenses) {
             Object.keys(window.appData[mKey].expenses).forEach(dStr => {
                 const day = parseInt(dStr);
-                window.appData[mKey].expenses[dStr].forEach(e => {
-                    dailyExpenses[day] += e.amount;
-                });
+                const itemDate = new Date(y, m, day);
+                
+                // Only include if it is in the past
+                if (itemDate < today) {
+                    window.appData[mKey].expenses[dStr].forEach(e => {
+                        dailyExpenses[day] += e.amount;
+                    });
+                }
             });
         }
 
-        // Add any temporary expenses (for the Queue loop simulation)
+        // 2. Add Temp Simulated Expenses (The new queue plan)
         tempAddedExpenses.forEach(t => {
             if(t.monthKey === mKey) {
                 dailyExpenses[t.day] += t.amount;
             }
         });
 
-        // Add the candidate amount to the specific check day
+        // 3. Add Candidate
         dailyExpenses[checkDate.getDate()] += amount;
 
-        // Verify Balance from Day 1 to End of Month
+        // 4. Verify Balance
         let runningSpent = 0;
         for(let d = 1; d <= daysInMonth; d++) {
             runningSpent += dailyExpenses[d];
             const accrued = dailyRate * d;
             const balance = accrued - runningSpent;
             
-            // If balance drops below zero on ANY day, it's unsafe.
             if (balance < -0.01) return false;
         }
 
         return true;
     };
 
-
     // --- QUEUE EXECUTION ---
     window.applySmartSchedule = () => {
-        if(!confirm("Reschedule all upcoming expenses to fit your budget?")) return;
+        if(!confirm("Reschedule everything based on this plan?")) return;
 
-        // 1. CLEAR existing future expenses from AppData
+        // 1. Identify Unscheduled items that are being scheduled
+        // We need to remove them from `appData.pending`
+        // Since we are iterating, let's build a new pending list that excludes them
+        // Using IDs would be better, but we can match by reference or rebuild.
+        // Simpler: If `sourceType` is pending, we find it in pending array and remove it.
+        // BUT, `tempQueue` objects are copies.
+        // Let's gather the *original indices* of pending items used.
+        const pendingIndicesToRemove = window.tempQueue
+            .filter(i => i.sourceType === 'pending')
+            .map(i => i.originalIndex)
+            .sort((a,b) => b - a); // Descending sort to splice correctly
+
+        // Remove from Pending DB
+        pendingIndicesToRemove.forEach(idx => {
+            if(idx > -1 && idx < window.appData.pending.length) {
+                window.appData.pending.splice(idx, 1);
+            }
+        });
+
+        // 2. Clear Future Calendar
         const today = new Date();
         today.setHours(0,0,0,0);
         
@@ -1004,35 +1082,26 @@
             });
         });
 
-        // 2. Schedule Items One by One
-        // We keep a list of items we have placed *in this transaction* so isSafeToSpend can see them
-        const newlyPlacedItems = []; 
-        let dateCursor = new Date(today); 
-
+        // 3. Commit Temp Queue to Calendar using the pre-calculated projection
+        // We re-run the simulation logic to be safe and get the exact date again
+        let simulatedExpenses = [];
+        
         window.tempQueue.forEach(item => {
             let placed = false;
             let safety = 0;
-
-            // Reset cursor to today for high priority items? 
-            // Or keep cursor moving? 
-            // "Plan Queue" implies order matters. We should try to place Item 1 as early as possible, 
-            // then Item 2 as early as possible.
-            dateCursor = new Date(today);
+            let dateCursor = new Date(today);
 
             while (!placed && safety < 365) {
-                const mKey = window.getMonthKey(dateCursor);
-                const day = dateCursor.getDate();
-
-                // Check if placing here is safe for the WHOLE future of the month
-                // pass newlyPlacedItems to the check so it knows about previous loop iterations
-                const safe = window.isSafeToSpend(item.amount, dateCursor, newlyPlacedItems);
-
+                const safe = window.isSafeToSpend(item.amount, dateCursor, simulatedExpenses);
                 if (safe) {
-                    // It fits!
+                    const mKey = window.getMonthKey(dateCursor);
+                    const day = dateCursor.getDate();
+                    
                     if(!window.appData[mKey]) window.appData[mKey] = { expenses: {} };
                     if(!window.appData[mKey].expenses) window.appData[mKey].expenses = {};
                     if(!window.appData[mKey].expenses[day]) window.appData[mKey].expenses[day] = [];
                     
+                    // Create clean item (remove temp props)
                     const cleanItem = {
                         amount: item.amount,
                         desc: item.desc,
@@ -1042,13 +1111,9 @@
                     };
 
                     window.appData[mKey].expenses[day].push(cleanItem);
-                    
-                    // Add to temp array so next iteration sees it
-                    newlyPlacedItems.push({ monthKey: mKey, day: day, amount: item.amount });
-                    
+                    simulatedExpenses.push({ monthKey: mKey, day: day, amount: item.amount });
                     placed = true;
                 } else {
-                    // Try next day
                     dateCursor.setDate(dateCursor.getDate() + 1);
                 }
                 safety++;
@@ -1058,6 +1123,8 @@
         window.saveToCloud();
         window.closeQueueModal();
         window.renderCalendar();
+        window.renderPendingList(); // Pending items removed
+        window.showToast("Schedule updated!", "success");
     };
 
     // --- UNSCHEDULED EXPENSES LOGIC ---
@@ -1082,7 +1149,6 @@
             amt = Math.round(amt * 100) / 100; 
         }
 
-        // VALIDATION
         if(!window.checkExpenseLimit(amt, window.currentDate)) return;
 
         if (!window.appData.pending) window.appData.pending = [];
@@ -1105,7 +1171,7 @@
         }
         
         amtInput.value = ''; descInput.value = ''; linkInput.value = '';
-        taxInput.checked = true; // DEFAULT TRUE
+        taxInput.checked = true; 
         window.saveToCloud();
         window.showToast("Item added!", "success");
     };
@@ -1222,15 +1288,11 @@
         window.showToast("Scheduled!", "success");
     };
 
-    // --- Updated Smart Scheduler Logic (Lookahead) ---
     window.findNextAffordableDate = (amount) => {
         const today = new Date();
-        // Look ahead 1 year
         for(let i=0; i<365; i++) {
             const checkDate = new Date();
             checkDate.setDate(today.getDate() + i);
-            
-            // USE THE NEW SAFE CHECK
             if(window.isSafeToSpend(amount, checkDate)) {
                 return checkDate;
             }
@@ -1238,7 +1300,7 @@
         return null;
     };
 
-   // --- CALENDAR RENDER (With "Look-Ahead" True Availability) ---
+    // --- CALENDAR RENDER ---
     window.renderCalendar = () => {
         const grid = document.getElementById('calendarGrid');
         grid.innerHTML = '';
@@ -1249,7 +1311,6 @@
         document.getElementById('currentMonthLabel').textContent = window.currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
         const currentBudget = window.getBudgetForDate(window.currentDate);
-        // Only update input if not focused
         if(document.activeElement !== document.getElementById('budgetInput')) {
             document.getElementById('budgetInput').value = currentBudget || '';
         }
@@ -1265,12 +1326,11 @@
         const monthKey = window.getMonthKey(window.currentDate);
         const expensesMap = (window.appData[monthKey] && window.appData[monthKey].expenses) ? window.appData[monthKey].expenses : {};
         
-        const rawBalances = [];  // Technical balance on that specific day
-        const safeBalances = []; // The "True Available" (lowest future dip)
+        const rawBalances = [];  
+        const safeBalances = [];
         
         let tempRunningSpent = 0;
 
-        // 1. Calculate Raw Balances (Standard)
         for(let d=1; d<=daysInMonth; d++) {
             const dayExpenses = expensesMap[d] || [];
             const dayCost = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
@@ -1280,19 +1340,13 @@
             rawBalances[d] = accrued - tempRunningSpent;
         }
 
-        // 2. Calculate Safe Balances (Look-Ahead / Backwards Ripple)
-        // We start from the end of the month. The "Safe" amount for Day X 
-        // is the Minimum of (RawBalance Day X, SafeBalance Day X+1)
         let minFuture = Infinity;
         for(let d=daysInMonth; d>=1; d--) {
-            // If the raw balance on this day is lower than what we've seen in the future,
-            // this becomes the new "low water mark".
             if(rawBalances[d] < minFuture) minFuture = rawBalances[d];
             safeBalances[d] = minFuture;
         }
         
-        // --- STEP 1.5: UPDATE MONTH SUMMARY ---
-        // Shows total scheduled spend vs total budget
+        // --- MONTH SUMMARY ---
         const totalScheduled = tempRunningSpent;
         const totalBudgetVal = currentBudget || 0;
         const remainingMonth = totalBudgetVal - totalScheduled;
@@ -1315,9 +1369,7 @@
             summaryDiv.innerHTML = "Set a budget above to see monthly progress.";
         }
 
-
-        // --- STEP 2: RENDER GRID ---
-
+        // --- RENDER GRID ---
         for(let i=0; i<firstDayOfMonth; i++) {
             const d = document.createElement('div');
             d.className = 'day-cell empty';
@@ -1343,10 +1395,7 @@
             }
 
             const dayExpenses = expensesMap[day] || [];
-            
-            // DISPLAY: Use the Safe Balance (True Available)
             const balance = safeBalances[day];
-
             const dayName = dateObj.toLocaleDateString('en-US', {weekday:'short'});
 
             let chipsHtml = '';
@@ -1356,7 +1405,6 @@
                 </div>`;
             });
 
-            // -0.01 tolerance for floating point math
             const balClass = balance >= -0.01 ? 'bal-pos' : 'bal-neg';
 
             cell.innerHTML = `
@@ -1373,11 +1421,11 @@
         }
     };
 
-    // --- MODAL LOGIC (Edit Day) ---
+    // --- MODAL LOGIC ---
     window.openModal = (day, expenses) => {
         window.selectedDate = new Date(window.currentDate.getFullYear(), window.currentDate.getMonth(), day);
         window.editingExpenseIndex = -1;
-        window.reschedulingIndex = -1; // Reset reschedule state
+        window.reschedulingIndex = -1; 
         
         document.getElementById('modalTitle').textContent = `Edit ${window.selectedDate.toLocaleDateString('en-US', {month:'short', day:'numeric'})}`;
         document.getElementById('expenseModal').classList.add('active');
@@ -1408,11 +1456,8 @@
             div.className = 'expense-list-item';
             if(idx === window.editingExpenseIndex) div.classList.add('editing');
 
-            // --- RESCHEDULING UI vs NORMAL UI ---
             if(idx === window.reschedulingIndex) {
-                // Determine today string for min date
                 const todayStr = new Date().toISOString().split('T')[0];
-                
                 div.innerHTML = `
                     <div style="flex-grow:1; display:flex; flex-direction:column; gap:5px;">
                         <span style="font-size:0.85rem; font-weight:bold;">Move "${item.desc}" to:</span>
@@ -1424,7 +1469,6 @@
                     </div>
                 `;
             } else {
-                // Standard View
                 let linkHtml = item.link ? `<a href="${item.link}" target="_blank" onclick="event.stopPropagation()">🔗</a>` : '';
                 div.innerHTML = `
                     <div>
@@ -1443,7 +1487,6 @@
         });
     };
 
-    // --- RESCHEDULE LOGIC ---
     window.initReschedule = (idx) => {
         window.reschedulingIndex = idx;
         window.renderModalList();
@@ -1460,17 +1503,13 @@
             window.showToast("Please pick a date.", "error");
             return;
         }
-        
-        // Parse target date
-        const parts = dateInput.value.split('-'); // YYYY-MM-DD
+        const parts = dateInput.value.split('-'); 
         const targetDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
         
-        // 1. Remove from current day
         const monthKey = window.getMonthKey(window.selectedDate);
         const day = window.selectedDate.getDate();
         const item = window.appData[monthKey].expenses[day].splice(idx, 1)[0];
         
-        // 2. Add to new target day
         const targetMKey = window.getMonthKey(targetDate);
         const targetD = targetDate.getDate();
         
@@ -1480,19 +1519,16 @@
         
         window.appData[targetMKey].expenses[targetD].push(item);
         
-        // 3. Save & Refresh
         window.saveToCloud();
         window.reschedulingIndex = -1;
-        
-        window.renderModalList(); // Refresh list (item will disappear)
-        window.renderCalendar(); // Refresh balances
+        window.renderModalList();
+        window.renderCalendar();
         window.showToast("Rescheduled!", "success");
     };
 
     window.unscheduleExpense = (idx) => {
         const monthKey = window.getMonthKey(window.selectedDate);
         const day = window.selectedDate.getDate();
-        
         const item = window.appData[monthKey].expenses[day].splice(idx, 1)[0];
         
         if(!window.appData.pending) window.appData.pending = [];
@@ -1581,19 +1617,15 @@
 
     window.deleteExpense = (idx) => {
         if(!confirm("Remove this item?")) return;
-        
         const monthKey = window.getMonthKey(window.selectedDate);
         const day = window.selectedDate.getDate();
-        
         window.appData[monthKey].expenses[day].splice(idx, 1);
         window.saveToCloud();
-        
         if(idx === window.editingExpenseIndex) {
             window.editingExpenseIndex = -1;
             document.getElementById('modalSaveBtn').textContent = "Save Item";
             document.getElementById('expenseAmount').value = '';
         }
-        
         window.renderModalList();
         window.renderCalendar();
         window.showToast("Deleted", "success");
@@ -1603,16 +1635,12 @@
         document.getElementById('expenseModal').classList.remove('active');
     };
 
-    // --- TOAST SYSTEM ---
     window.showToast = (msg, type = 'neutral') => {
         const container = document.getElementById('toast-container');
         const el = document.createElement('div');
         el.className = `toast ${type}`;
         el.innerHTML = msg;
-        
         container.appendChild(el);
-        
-        // Remove after 3 seconds
         setTimeout(() => {
             el.style.opacity = '0';
             el.style.transform = 'translateY(10px)';
@@ -1621,13 +1649,12 @@
         }, 3000);
     };
 
-    // --- DATA EXPORT ---
     window.exportData = () => {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.appData, null, 2));
         const downloadAnchorNode = document.createElement('a');
         downloadAnchorNode.setAttribute("href", dataStr);
         downloadAnchorNode.setAttribute("download", "pacebudget_backup_" + new Date().toISOString().split('T')[0] + ".json");
-        document.body.appendChild(downloadAnchorNode); // required for firefox
+        document.body.appendChild(downloadAnchorNode); 
         downloadAnchorNode.click();
         downloadAnchorNode.remove();
         window.showToast("Data export started!", "success");
