@@ -1170,9 +1170,16 @@
                     if (itemDate >= today) {
                         if(!window.appData.pending) window.appData.pending = [];
                         // Move all
+                        const pendingIds = new Set(window.appData.pending.map(p => p.id));
+
                         monthData.expenses[day].forEach(exp => {
+                        if (!pendingIds.has(exp.id)) {
                             window.appData.pending.push(exp);
+                        }
                         });
+
+
+
                         // Clear day
                         delete monthData.expenses[day];
                     }
@@ -1241,17 +1248,17 @@ window.isSafeToSpend = (amount, targetDate) => {
 
             // 1. Remove used items from their Original Locations
             
-            // A. Remove Pending Items from DB
-            const pendingIndicesToRemove = window.tempQueue
+            // STEP 1A: Remove scheduled pending items (ID-safe)
+            const pendingIdsToRemove = new Set(
+            window.tempQueue
                 .filter(i => i.sourceType === 'pending')
-                .map(i => i.originalIndex)
-                .sort((a,b) => b - a); 
+                .map(i => i.id)
+            );
 
-            pendingIndicesToRemove.forEach(idx => {
-                if(idx > -1 && idx < window.appData.pending.length) {
-                    window.appData.pending.splice(idx, 1);
-                }
-            });
+            window.appData.pending = window.appData.pending.filter(
+            p => !pendingIdsToRemove.has(p.id)
+            );
+
 
             // B. Remove Calendar Items from DB 
             // We only remove items that were actually in the queue.
@@ -1306,6 +1313,7 @@ window.isSafeToSpend = (amount, targetDate) => {
                         if(!window.appData[mKey].expenses[day]) window.appData[mKey].expenses[day] = [];
                         
                         const cleanItem = {
+                             id: item.id || window.makeExpenseId(),
                             amount: item.amount,
                             desc: item.desc,
                             link: item.link || '',
@@ -1452,6 +1460,10 @@ window.isSafeToSpend = (amount, targetDate) => {
             list.appendChild(div);
         });
     };
+    window.makeExpenseId = () =>
+        crypto.randomUUID ? crypto.randomUUID() :
+        Date.now().toString(36) + Math.random().toString(36).slice(2);
+
 
     window.deletePending = (idx) => {
         window.showCustomConfirm("Delete this unscheduled expense?", () => {
@@ -1615,14 +1627,16 @@ window.isSafeToSpend = (amount, targetDate) => {
             });
 
             const balClass = balance >= -0.01 ? 'bal-pos' : 'bal-neg';
-
             cell.innerHTML = `
                 <div class="date-number">
                     <span>${day}</span>
                     <span class="day-weekday">${dayName}</span>
                 </div>
                 <div class="expense-chips">${chipsHtml}</div>
-                <div class="balance-indicator ${balClass}">$${balance.toFixed(0)}</div>
+                <div class="balance-indicator ${balClass}">
+                    <span style="font-size: 1em; font-weight: normal; color: #666;">Available:</span> 
+                    $${balance.toFixed(0)}
+                </div>
             `;
             
             cell.onclick = () => window.openModal(day, dayExpenses);
@@ -1714,7 +1728,10 @@ window.isSafeToSpend = (amount, targetDate) => {
         window.renderModalList();
     };
 
+    
+
     window.performReschedule = (idx) => {
+        
         const dateInput = document.getElementById(`rescheduleDateInput-${idx}`);
         if(!dateInput.value) {
             window.showToast("Please pick a date.", "error");
