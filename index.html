@@ -617,7 +617,7 @@
         </div>
 
         <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #eee; padding-top:15px;">
-             <button class="btn-text" onclick="logout()" style="color:var(--danger);">Sign Out</button>
+             <button class="btn-text" onclick="logout(); closeSettings()" style="color:var(--danger);">Sign Out</button>
              <button class="btn-outline" onclick="closeSettings()">Done</button>
         </div>
     </div>
@@ -1547,6 +1547,10 @@ window.isSafeToSpend = (amount, targetDate) => {
         const monthKey = window.getMonthKey(window.currentDate);
         const expensesMap = (window.appData[monthKey] && window.appData[monthKey].expenses) ? window.appData[monthKey].expenses : {};
         
+        // NEW: Variables to track split totals
+        let pastSpent = 0;
+        let futureScheduled = 0;
+        
         const rawBalances = [];
         const safeBalances = [];
         let tempRunningSpent = 0;
@@ -1555,6 +1559,24 @@ window.isSafeToSpend = (amount, targetDate) => {
             const dayExpenses = expensesMap[d] || [];
             const dayCost = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
             tempRunningSpent += dayCost;
+
+            // NEW: Logic to distinguish Spent vs Scheduled
+            // If viewing a past month, everything is 'pastSpent'.
+            // If viewing a future month, everything is 'futureScheduled'.
+            // If viewing current month, split based on today's date.
+            if (today.getFullYear() > y || (today.getFullYear() === y && today.getMonth() > m)) {
+                pastSpent += dayCost;
+            } else if (today.getFullYear() < y || (today.getFullYear() === y && today.getMonth() < m)) {
+                futureScheduled += dayCost;
+            } else {
+                // Current Month
+                if (d <= today.getDate()) {
+                    pastSpent += dayCost;
+                } else {
+                    futureScheduled += dayCost;
+                }
+            }
+
             const accrued = dailyRate * d;
             rawBalances[d] = accrued - tempRunningSpent;
         }
@@ -1566,27 +1588,35 @@ window.isSafeToSpend = (amount, targetDate) => {
         }
         
         // --- UPDATE SUMMARY ---
-        const totalScheduled = tempRunningSpent;
-        const totalBudgetVal = currentBudget || 0;
-        const remainingMonth = totalBudgetVal - totalScheduled;
-        
-        const summaryDiv = document.getElementById('monthSummary');
-        if(totalBudgetVal > 0) {
-            summaryDiv.innerHTML = `
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span>Spent: <strong>$${totalScheduled.toFixed(0)}</strong></span>
-                    <span>Budget: <strong>$${totalBudgetVal.toFixed(0)}</strong></span>
-                </div>
-                <div style="width:100%; background:#e2e8f0; height:6px; border-radius:3px; overflow:hidden;">
-                    <div style="width:${Math.min((totalScheduled/totalBudgetVal)*100, 100)}%; background:${remainingMonth >= 0 ? 'var(--primary)' : 'var(--danger)'}; height:100%;"></div>
-                </div>
-                <div style="text-align:right; font-size:0.75rem; color:${remainingMonth >= 0 ? 'var(--success)' : 'var(--danger)'}; margin-top:2px;">
-                    ${remainingMonth >= 0 ? 'Remaining: $' + remainingMonth.toFixed(0) : 'Over: $' + Math.abs(remainingMonth).toFixed(0)}
-                </div>
-            `;
-        } else {
-            summaryDiv.innerHTML = "Set a budget above to see monthly progress.";
-        }
+            const totalBudgetVal = currentBudget || 0;
+            const available = totalBudgetVal - (pastSpent + futureScheduled);
+
+            const summaryDiv = document.getElementById('monthSummary');
+            if(totalBudgetVal > 0) {
+                // Calculate percentages for the bar widths
+                const spentPct = Math.min(100, (pastSpent / totalBudgetVal) * 100);
+                const schedPct = Math.min(100, (futureScheduled / totalBudgetVal) * 100);
+                // "Available" just fills the rest of the space visually in the gray background, 
+                // but if you want to verify total width:
+                const totalBarFilled = spentPct + schedPct;
+
+                summaryDiv.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:6px; font-weight:500;">
+                        <span style="color:#334155">Spent: <strong>$${pastSpent.toFixed(0)}</strong></span>
+                        <span style="color:#2563eb">Scheduled: <strong>$${futureScheduled.toFixed(0)}</strong></span>
+                        <span style="color:#10b981">Available: <strong>$${available.toFixed(0)}</strong></span>
+                    </div>
+                    
+                    <div style="display:flex; width:100%; height:12px; border-radius:6px; overflow:hidden; background:#e2e8f0; border:1px solid #cbd5e1;">
+                        <div style="width:${spentPct}%; background:#334155;" title="Spent"></div>
+                        
+                        <div style="width:${schedPct}%; background:#2563eb;" title="Scheduled"></div>
+                        
+                        </div>
+                `;
+            } else {
+                summaryDiv.innerHTML = '<div style="color:#64748b; font-size:0.9rem;">Set a budget to see your monthly breakdown.</div>';
+            }
 
         // --- RENDER GRID ---
         for(let i=0; i<firstDayOfMonth; i++) {
