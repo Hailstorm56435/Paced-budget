@@ -1549,48 +1549,47 @@ window.isSafeToSpend = (amount, targetDate) => {
         const isCurrentMonth = (today.getFullYear() === y && today.getMonth() === m);
 
         // --- PRE-CALCULATE BALANCES ---
-        const monthKey = window.getMonthKey(window.currentDate);
-        const expensesMap = (window.appData[monthKey] && window.appData[monthKey].expenses) ? window.appData[monthKey].expenses : {};
-        
-        // NEW: Variables to track split totals
-        let pastSpent = 0;
-        let futureScheduled = 0;
-        
-        const rawBalances = [];
-        const safeBalances = [];
-        let tempRunningSpent = 0;
+            const monthKey = window.getMonthKey(window.currentDate);
+            const expensesMap = (window.appData[monthKey] && window.appData[monthKey].expenses) ? window.appData[monthKey].expenses : {};
+            
+            // Track totals for the Summary (from your previous update)
+            let pastSpent = 0;
+            let futureScheduled = 0;
+            
+            const rawBalances = [];
+            const safeBalances = []; // This will hold the "Smart" balance
+            let tempRunningSpent = 0;
 
-        for(let d=1; d<=daysInMonth; d++) {
-            const dayExpenses = expensesMap[d] || [];
-            const dayCost = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
-            tempRunningSpent += dayCost;
+            // 1. Forward Loop: Calculate the raw running balance for each day
+            for(let d=1; d<=daysInMonth; d++) {
+                const dayExpenses = expensesMap[d] || [];
+                const dayCost = dayExpenses.reduce((sum, item) => sum + item.amount, 0);
+                tempRunningSpent += dayCost;
 
-            // NEW: Logic to distinguish Spent vs Scheduled
-            // If viewing a past month, everything is 'pastSpent'.
-            // If viewing a future month, everything is 'futureScheduled'.
-            // If viewing current month, split based on today's date.
-            if (today.getFullYear() > y || (today.getFullYear() === y && today.getMonth() > m)) {
-                pastSpent += dayCost;
-            } else if (today.getFullYear() < y || (today.getFullYear() === y && today.getMonth() < m)) {
-                futureScheduled += dayCost;
-            } else {
-                // Current Month
-                if (d <= today.getDate()) {
+                // Summary Logic (Keep this from before)
+                if (today.getFullYear() > y || (today.getFullYear() === y && today.getMonth() > m)) {
                     pastSpent += dayCost;
-                } else {
+                } else if (today.getFullYear() < y || (today.getFullYear() === y && today.getMonth() < m)) {
                     futureScheduled += dayCost;
+                } else {
+                    if (d <= today.getDate()) pastSpent += dayCost;
+                    else futureScheduled += dayCost;
                 }
+
+                const accrued = dailyRate * d;
+                rawBalances[d] = accrued - tempRunningSpent;
             }
 
-            const accrued = dailyRate * d;
-            rawBalances[d] = accrued - tempRunningSpent;
-        }
-
-        let minFuture = Infinity;
-        for(let d=daysInMonth; d>=1; d--) {
-            if(rawBalances[d] < minFuture) minFuture = rawBalances[d];
-            safeBalances[d] = minFuture;
-        }
+            // 2. Backward Loop: Calculate "Safe Balance" (Account for future expenses)
+            // We look backwards from the end of the month.
+            // The "Safe Balance" is the lowest value the balance will EVER dip to in the future.
+            let minFuture = Infinity;
+            for(let d=daysInMonth; d>=1; d--) {
+                if(rawBalances[d] < minFuture) {
+                    minFuture = rawBalances[d];
+                }
+                safeBalances[d] = minFuture;
+            }
         
         // --- UPDATE SUMMARY ---
             const totalBudgetVal = currentBudget || 0;
@@ -1713,16 +1712,15 @@ window.isSafeToSpend = (amount, targetDate) => {
         cell.appendChild(chipContainer);
 
         // Safe Balance (Bottom Right)
-        const bal = rawBalances[day];
-        const safe = safeBalances[day]; 
+        // CHANGE THIS LINE: Use safeBalances instead of rawBalances
+        const bal = safeBalances[day]; 
+        
         const balDiv = document.createElement('div');
         balDiv.className = 'balance-indicator';
         
-        // Color logic
         if(bal >= 0) balDiv.classList.add('bal-pos');
         else balDiv.classList.add('bal-neg');
 
-        // Only show balance if we have a budget set
         if(currentBudget > 0) {
             balDiv.textContent = `$${bal.toFixed(0)}`;
         }
