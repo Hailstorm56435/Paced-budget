@@ -707,7 +707,7 @@
     let currentUser = null;
     let unsubscribe = null; 
 
-    window.appData = { pending: [], emailList: [], budgets: {}, displayName: '' };
+    //window.appData = { pending: [], emailList: [], budgets: {}, displayName: '' };
 
     // --- AUTH ---
     window.handleLogin = (e) => { e.preventDefault(); window.login(); };
@@ -842,6 +842,7 @@
 </script>
 
 <script>
+    window.appData = { pending: [], emailList: [], budgets: {}, displayName: '' };
     // --- APP LOGIC ---
 
     window.currentDate = new Date();
